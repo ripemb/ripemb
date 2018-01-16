@@ -1,18 +1,18 @@
 # Makefile for RIPE
 # @author John Wilander & Nick Nikiforakis
+# Modified for RISC-V by John Merrill
 
 #Depending on how you test your system you may want to comment, or uncomment
 #the following
-CFLAGS=-fno-stack-protector
-CC=gcc
+CFLAGS= -fno-stack-protector -z execstack
+CC=riscv64-unknown-elf-gcc
+
 all: ripe_attack_generator
 
 clean:
-	rm ./build/*
+	rm -rf build/ out/
 
-
-# ATTACK GENERATOR COMPILE
 ripe_attack_generator: ./source/ripe_attack_generator.c
-	${CC} ${CFLAGS} ./source/ripe_attack_generator.c -m32 -o ./build/ripe_attack_generator 
-	
-
+	mkdir -p build/ out/
+	$(CC) -m32 \
+		./source/ripe_attack_generator.c -o ./build/ripe_attack_generator

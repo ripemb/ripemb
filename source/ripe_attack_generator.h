@@ -1,10 +1,12 @@
 /* RIPE was originally developed by John Wilander (@johnwilander)
  * and was debugged and extended by Nick Nikiforakis (@nicknikiforakis)
  *
+ * The RISC-V port of RIPE was developed by John Merrill.
+ *
  * Released under the MIT license (see file named LICENSE)
  *
  * This program is part the paper titled
- * RIPE: Runtime Intrusion Prevention Evaluator 
+ * RIPE: Runtime Intrusion Prevention Evaluator
  * Authored by: John Wilander, Nick Nikiforakis, Yves Younan,
  *              Mariam Kamkar and Wouter Joosen
  * Published in the proceedings of ACSAC 2011, Orlando, Florida
@@ -26,7 +28,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include <limits.h>
-#include <getopt.h>
+#include <stdint.h>
 #include <setjmp.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -37,46 +39,40 @@
 typedef int boolean;
 enum booleans {FALSE=0, TRUE};
 
-#define DEFAULT_DUMP_SIZE 192
-#define HEX_STRING_SIZE 11  /* Including null terminator */
-
-#define DEBUG_MEMDUMP "./result/debug_memdump.txt"
+const char *bin4b[16] = {"0000", "0001", "0010", "0011",
+		     	 "0100", "0101", "0110", "0111",
+		      	 "1000", "1001", "1010", "1011",
+	 	      	 "1100", "1101", "1110", "1111"};
 
 typedef struct attack_form ATTACK_FORM;
 struct attack_form {
-  enum techniques technique;
-  enum inject_params inject_param;
-  enum code_ptrs code_ptr;
-  enum locations location;
-  enum functions function;
+        enum techniques technique;
+        enum inject_params inject_param;
+        enum code_ptrs code_ptr;
+        enum locations location;
+        enum functions function;
 };
 
 typedef struct char_payload CHARPAYLOAD;
 struct char_payload {
-  enum inject_params inject_param;
-  size_t size;
-  void *overflow_ptr;  /* Points to code pointer (direct attack) */
-                       /* or general pointer (indirect attack)   */
-  char *buffer;
+        enum inject_params inject_param;
+        size_t size;
+        void *overflow_ptr; /* Points to code pointer (direct attack) */
+                            /* or general pointer (indirect attack)   */
+        char *buffer;
 
-  jmp_buf *jmp_buffer;
+        jmp_buf *jmp_buffer;
 
-  long stack_jmp_buffer_param;
-  size_t offset_to_copied_base_ptr;
-  size_t offset_to_fake_return_addr;
-  long *fake_return_addr;
-  long *ptr_to_correct_return_addr;
+        long stack_jmp_buffer_param;
+        size_t offset_to_copied_base_ptr;
+        size_t offset_to_fake_return_addr;
+        long *fake_return_addr;
+        long *ptr_to_correct_return_addr;
 };
 
-typedef struct memory_dump MEM_DUMP;
-struct memory_dump {
-  char address[HEX_STRING_SIZE];
-  char value[HEX_STRING_SIZE];
-};
-
-struct attackme{
-    char buffer[256];
-    int (*func_ptr)(const char *, int);
+struct attackme {
+        char buffer[256];
+        int (*func_ptr)(const char *, int);
 };
 
 /**
@@ -86,15 +82,14 @@ struct attackme{
  * -c code pointer
  * -l memory location
  * -f function to overflow with
- * -d output debug info (set to 't' for TRUE)
- * (-e output error messages)
+ * -d output debug info
  * -o set output stream
  */
 int main(int argc, char **argv);
 
-void perform_attack(FILE *output_stream,
-		    int (*stack_func_ptr_param)(const char *),
-		    jmp_buf stack_jmp_buffer_param);
+void perform_attack(
+             		int (*stack_func_ptr_param)(const char *),
+                    jmp_buf stack_jmp_buffer_param);
 
 /* BUILD_PAYLOAD()                                                  */
 /*                                                                  */
@@ -123,10 +118,6 @@ void perform_attack(FILE *output_stream,
 /* and start the padding at index size_sc                           */
 boolean build_payload(CHARPAYLOAD *payload);
 
-boolean contains_terminating_char(unsigned long value);
-void remove_terminating_chars(char *contents, size_t length);
-void remove_nulls(char *contents, size_t length);
-
 void set_technique(char *choice);
 void set_inject_param(char *choice);
 void set_code_ptr(char *choice);
@@ -134,28 +125,51 @@ void set_location(char *choice);
 void set_function(char *choice);
 
 int dummy_function(const char *str) {
-  return 0;
+        printf("Dummy function\n");
+        return 0;
 }
-
-void save_memory(struct memory_dump *dump, char *start, size_t size);
-void print_payload_info(FILE *stream, CHARPAYLOAD *payload);
-void print_memory(FILE *stream, char *start, size_t words);
-void print_two_memory_dumps(FILE *stream,
-		       struct memory_dump *dump1,
-		       struct memory_dump *dump2,
-		       size_t size);
-void print_three_memory_dumps(FILE *stream,
-		       struct memory_dump *dump1,
-		       struct memory_dump *dump2,
-		       struct memory_dump *dump3,
-		       size_t size);
 
 boolean is_attack_possible();
 void homebrew_memcpy(void *dst, const void *src, size_t len);
 
-//NN
-void gadget1(int a, int b);
-void gadget2(int a, int b);
-int  gadget3(int a, int b);
+/*
+RIPE shellcode uses the following instructions:
+la <reg>, <addr of shellcode_func()>
+jalr <reg>
+
+The first la instruction is disassembled to:
+lui <reg>, <upper 20 bits>
+addi <reg>, <reg>, <lower 12 bits>
+
+Thus, the shellcode follows the pattern
+shown in the following encodings:
+
+LUI: xxxx xxxx xxxx xxxx xxxx xxxx x011 0111
+     \                  / \    /\      /
+             imm value         reg#  opcode
+
+
+ADDI: xxxx xxxx xxxx xxxx x000 xxxx x011 0011
+      \        / \    /    \    /\      /
+        imm value     reg#      reg#  opcode
+
+
+JALR: 0000 0000 0000 xxxx x000 0000 1110 0111
+                     \    /          \      /
+                      reg#            opcode
+
+The shellcode is formatted so that:
+  1. All instructions are stored to a single string
+  1. Byte order is converted to little-endian
+*/
+void build_shellcode(char *shellcode);
+void hex_to_string(char *str, size_t val);
+void format_instruction(char *dest, size_t insn);
+
+const char *hex_to_bin(char c) {
+	if (c >= '0' && c <= '9') return bin4b[c - '0'];
+	if (c >= 'a' && c <= 'f') return bin4b[10 + c - 'a'];
+	return NULL;
+}
 
 #endif /* !RIPE_ATTACK_GENERATOR_H */
