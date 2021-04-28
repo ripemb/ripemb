@@ -142,35 +142,35 @@ perform_attack(
 {
     jmp_buf stack_jmp_buffer;
 
-	/* STACK TARGETS */
-	/*
-	Function Pointer
-	Two general pointers for indirect attack
-	DOP flag
-	Arbitrary read data
-	Overflow buffer
-	Vulnerable struct
-	*/
+    /* STACK TARGETS */
+    /*
+    Function Pointer
+    Two general pointers for indirect attack
+    DOP flag
+    Arbitrary read data
+    Overflow buffer
+    Vulnerable struct
+    */
     int (* stack_func_ptr)(const char *);
     long * stack_mem_ptr;
     long * stack_mem_ptr_aux;
     int stack_flag;
-	char stack_secret[32];
-	strcpy(stack_secret, data_secret);
+    char stack_secret[32];
+    strcpy(stack_secret, data_secret);
     char stack_buffer[1024];
     struct attackme stack_struct;
     stack_struct.func_ptr = &dummy_function;
 
     /* HEAP TARGETS */
-	/*
-	Vulnerable struct
-	Overflow buffers
-	DOP flag
-	Two general pointers for indirect attack
-	Arbitrary read data
-	Function pointer array
-	Longjmp buffer
-	*/
+    /*
+    Vulnerable struct
+    Overflow buffers
+    DOP flag
+    Two general pointers for indirect attack
+    Arbitrary read data
+    Function pointer array
+    Longjmp buffer
+    */
     struct attackme * heap_struct =
       (struct attackme *) malloc(sizeof(struct attackme));
     heap_struct->func_ptr = dummy_function;
@@ -185,20 +185,20 @@ perform_attack(
     int * heap_flag = (int *) malloc(sizeof(int *));
     long * heap_mem_ptr_aux;
     long * heap_mem_ptr;
-	char * heap_secret;
+    char * heap_secret;
     int(**heap_func_ptr)(const char *) = 0;
     jmp_buf * heap_jmp_buffer;
 
     /* BSS TARGETS */
-	/*
-	Function pointer
-	DOP flag
-	Two general pointers for indirect attack
-	Arbitrary read data
-	Overflow buffer
-	Longjmp buffer
-	Vulnerable Struct
-	*/
+    /*
+    Function pointer
+    DOP flag
+    Two general pointers for indirect attack
+    Arbitrary read data
+    Overflow buffer
+    Longjmp buffer
+    Vulnerable Struct
+    */
     static int (* bss_func_ptr)(const char *);
     static int * bss_flag;
     static long * bss_mem_ptr_aux;
@@ -228,7 +228,7 @@ perform_attack(
     // assigning value to bss buffers
     //  to place them 'behind' other locals
     bss_buffer[0]  = 'a';
-  	strcpy(bss_secret, data_secret);
+    strcpy(bss_secret, data_secret);
 
     // write shellcode with correct jump address
     build_shellcode(shellcode_nonop);
@@ -278,10 +278,10 @@ perform_attack(
                 heap_mem_ptr_aux = (long *) heap_buffer2;
                 heap_mem_ptr     = (long *) heap_buffer3;
 
-				if (attack.code_ptr == VAR_LEAK) {
-					heap_secret = heap_buffer2;
-					strcpy(heap_secret, data_secret);
-				}
+                if (attack.code_ptr == VAR_LEAK) {
+                    heap_secret = heap_buffer2;
+                    strcpy(heap_secret, data_secret);
+                }
                 // Also set the location of the function pointer and the
                 // longjmp buffer on the heap (the same since only choose one)
                 heap_func_ptr = malloc(sizeof(void *));
@@ -427,7 +427,7 @@ perform_attack(
                             break;
                     }
                     break;
-				case VAR_LEAK:
+                case VAR_LEAK:
                     switch (attack.location) {
                         case STACK:
                             target_addr = &stack_secret;
@@ -443,7 +443,6 @@ perform_attack(
                             break;
                     }
                     break;
-					
             }
             break;
 
@@ -594,10 +593,10 @@ perform_attack(
                 case LONGJMP_BUF_BSS:
                     payload.overflow_ptr = bss_jmp_buffer;
                     break;
-				// indirect attacks don't apply to int overflows or leaks
+                // indirect attacks don't apply to int overflows or leaks
                 case VAR_BOF:
                 case VAR_IOF:
-				case VAR_LEAK:
+                case VAR_LEAK:
                     payload.overflow_ptr = &dop_dest;
                     break;
                 default:
@@ -807,9 +806,9 @@ perform_attack(
                     break;
             }
             break;
-		case VAR_LEAK:
-			data_leak(buffer);
-			break;
+        case VAR_LEAK:
+            data_leak(buffer);
+            break;
     }
 } /* perform_attack */
 
@@ -822,7 +821,7 @@ build_payload(CHARPAYLOAD * payload)
     size_t size_shellcode, bytes_to_pad;
     char * shellcode, * temp_char_buffer, * temp_char_ptr;
     
-	switch (attack.inject_param) {
+    switch (attack.inject_param) {
         case INJECTED_CODE_NO_NOP:
             if (payload->size < (size_shellcode_nonop + sizeof(long))) {
                 return FALSE;
@@ -834,17 +833,17 @@ build_payload(CHARPAYLOAD * payload)
             // 256 padding bytes for unsigned 8bit IOF
             if (attack.code_ptr == VAR_IOF)
                 payload->size = 256 + sizeof(long) + sizeof(char);
-			
-			if (attack.code_ptr == VAR_LEAK) {
-				// simulated packet with length included
-				payload->size += 32 - sizeof(long);
-				payload->buffer[0] = payload->size & 0xFF;
-				payload->buffer[1] = payload->size / 0x100;
-				payload->buffer[2] = 'A';
-				payload->buffer[3] = '\0';
-				payload->size = 4;
-				return TRUE;
-			}
+            
+            if (attack.code_ptr == VAR_LEAK) {
+                // simulated packet with length included
+                payload->size += 32 - sizeof(long);
+                payload->buffer[0] = payload->size & 0xFF;
+                payload->buffer[1] = payload->size / 0x100;
+                payload->buffer[2] = 'A';
+                payload->buffer[3] = '\0';
+                payload->size = 4;
+                return TRUE;
+            }
         case RETURN_ORIENTED_PROGRAMMING:
         case RETURN_INTO_LIBC:
             if (payload->size < sizeof(long))
@@ -888,11 +887,10 @@ build_payload(CHARPAYLOAD * payload)
     /* Finally, add the terminating null character at the end */
     memset((payload->buffer + payload->size - 1), '\0', 1);
     
-	if (output_debug_info)
+    if (output_debug_info)
         fprintf(stderr, "payload: %s\n", payload->buffer);
     return TRUE;
 
-	
 } /* build_payload */
 
 // call longjmp on a buffer in perform_attack()
@@ -979,16 +977,16 @@ iof(char * buf, uint32_t iv)
 
 void
 data_leak(char *buf) {
-	uint16_t size = buf[0] + (buf[1] * 0x100), i;
-	char *msg = (char *)malloc(size);
+    uint16_t size = buf[0] + (buf[1] * 0x100), i;
+    char *msg = (char *)malloc(size);
 
-	memcpy(msg, buf + 2, size);
-	for (i = 0; i < size; i++) {
-		if (msg[i] >= 0x20) putc(msg[i],stdout);
-	}
+    memcpy(msg, buf + 2, size);
+    for (i = 0; i < size; i++) {
+        if (msg[i] >= 0x20) putc(msg[i],stdout);
+    }
 
-	putc('\n', stdout);
-}			
+    putc('\n', stdout);
+}           
 
 /*********************/
 /* BUILD_SHELLCODE() */
@@ -1000,12 +998,12 @@ build_shellcode(char * shellcode)
     char lui_bin[33], addi_bin[33];                  // binary insn encodings (as strings)
     char lui_s[9], addi_s[9], * jalr_s = "000300e7"; // hex insn encodings
     size_t lui_val, addi_val, jalr_val;              // raw binary insn encodings
-	
-	// fix shellcode when lower bits become negative
-	if (((unsigned long)&shellcode_target & 0x00000fff) >= 0x800)
-		hex_to_string(attack_addr, &shellcode_target + 0x1000);
+
+    // fix shellcode when lower bits become negative
+    if (((unsigned long)&shellcode_target & 0x00000fff) >= 0x800)
+        hex_to_string(attack_addr, &shellcode_target + 0x1000);
     else
-		hex_to_string(attack_addr, &shellcode_target);
+        hex_to_string(attack_addr, &shellcode_target);
 
     // split attack address into low and high bit strings
     strncpy(low_bits, &attack_addr[5], 3);
@@ -1236,28 +1234,28 @@ is_attack_possible()
 
     if (attack.inject_param == DATA_ONLY) {
         if (attack.code_ptr != VAR_BOF &&
-          	attack.code_ptr != VAR_IOF &&
-			attack.code_ptr != VAR_LEAK)
+            attack.code_ptr != VAR_IOF &&
+            attack.code_ptr != VAR_LEAK)
         {
             print_reason("Error: Misused DOP code pointer parameters.\n");
-			return FALSE;
+            return FALSE;
         }
 
         if ((attack.code_ptr == VAR_LEAK || attack.code_ptr == VAR_IOF) && attack.technique == INDIRECT) {
             print_reason("Error: Impossible to do an indirect int overflow attack.\n");
-			return FALSE;
+            return FALSE;
         }
 
         if (attack.location == HEAP && attack.technique == INDIRECT) {
             print_reason("Error: Impossible to indirect attack the heap flag.\n");
-        	return FALSE;
-		}
+            return FALSE;
+        }
     } else if (attack.code_ptr == VAR_BOF ||
-			   attack.code_ptr == VAR_IOF ||
-			   attack.code_ptr == VAR_LEAK) {
+               attack.code_ptr == VAR_IOF ||
+               attack.code_ptr == VAR_LEAK) {
         print_reason("Error: Must use \"dataonly\" injection parameter for DOP attacks.\n");
-    	return FALSE;
-	}
+        return FALSE;
+    }
 
     // attacks targeting another memory location must be indirect
     switch (attack.location) {
@@ -1326,7 +1324,6 @@ is_attack_possible()
                 return FALSE;
             }
             break;
-
 
         case BSS:
             if ((attack.technique == DIRECT) &&

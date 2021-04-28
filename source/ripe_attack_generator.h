@@ -40,9 +40,9 @@ typedef int boolean;
 enum booleans {FALSE=0, TRUE};
 
 const char *bin4b[16] = {"0000", "0001", "0010", "0011",
-		     	 "0100", "0101", "0110", "0111",
-		      	 "1000", "1001", "1010", "1011",
-	 	      	 "1100", "1101", "1110", "1111"};
+                         "0100", "0101", "0110", "0111",
+                         "1000", "1001", "1010", "1011",
+                         "1100", "1101", "1110", "1111"};
 
 typedef struct attack_form ATTACK_FORM;
 struct attack_form {
@@ -88,7 +88,7 @@ struct attackme {
 int main(int argc, char **argv);
 
 void perform_attack(
-             		int (*stack_func_ptr_param)(const char *),
+                    int (*stack_func_ptr_param)(const char *),
                     jmp_buf stack_jmp_buffer_param);
 
 /* BUILD_PAYLOAD()                                                  */
@@ -167,9 +167,11 @@ void hex_to_string(char *str, size_t val);
 void format_instruction(char *dest, size_t insn);
 
 const char *hex_to_bin(char c) {
-	if (c >= '0' && c <= '9') return bin4b[c - '0'];
-	if (c >= 'a' && c <= 'f') return bin4b[10 + c - 'a'];
-	return NULL;
+    if (c >= '0' && c <= '9')
+        return bin4b[c - '0'];
+    if (c >= 'a' && c <= 'f')
+        return bin4b[10 + c - 'a'];
+    return NULL;
 }
 
 #endif /* !RIPE_ATTACK_GENERATOR_H */
