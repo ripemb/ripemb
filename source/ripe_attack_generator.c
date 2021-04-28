@@ -17,10 +17,10 @@
 static boolean output_debug_info = FALSE;
 #define print_reason(s) // fprintf(stderr, s)
 
-// JM: shellcode is generated in perform_attack()
+// shellcode is generated in perform_attack()
 char * shellcode_nonop[12];
 
-// JM: data-only target pointer
+// data-only target pointer
 uint32_t dop_dest = 0xdeadbeef;
 
 // Do not count for the null terminator since a null in the shellcode will
@@ -47,7 +47,7 @@ static uint32_t * data_mem_ptr[64] = { &dummy_function };
 static int (* data_func_ptr)(const char *) = &dummy_function;
 static jmp_buf data_jmp_buffer = { 1 };
 
-// JM: control data destinations
+// control data destinations
 void
 shellcode_target();
 void
@@ -57,28 +57,28 @@ rop_target();
 void
 dop_target(char * buf, uint32_t auth);
 
-// JM: contains buffer lower in memory than stack param, allowing for overflow
+// contains buffer lower in memory than stack param, allowing for overflow
 void
 set_low_buf(char ** buf);
 
-// JM: integer overflow vulnerability
+// integer overflow vulnerability
 void
 iof(char * buf, uint32_t iv);
 
-// JM: arbitrary read bug
+// arbitrary read bug
 void
 data_leak(char *buf);
 
-// JM: forces length param to register and jumps before return for stack param attacks
+// forces length param to register and jumps before return for stack param attacks
 void
 homebrew_memcpy_param(void * dst, const void * src, register size_t length);
 
-// JM: longjmp() is called from here
+// longjmp() is called from here
 void
 lj_func(jmp_buf lj_buf);
 
 // get ret address
-// JM: ra written to stack one word higher than bp
+// ra written to stack one word higher than bp
 #define OLD_BP_PTR   __builtin_frame_address(0)
 #define RET_ADDR_PTR ((void **) OLD_BP_PTR - 1)
 
@@ -212,7 +212,7 @@ perform_attack(
     char * buffer;
     /* Address to target for direct (part of) overflow */
     void * target_addr;
-    /* JM: Address for second overflow (indirect ret2libc attack) */
+    /* Address for second overflow (indirect ret2libc attack) */
     void * target_addr_aux;
     /* Buffer for storing a generated format string */
     char format_string_buf[16];
@@ -225,7 +225,7 @@ perform_attack(
         exit(1);
     }
 
-    // JM: assigning value to bss buffers
+    // assigning value to bss buffers
     //  to place them 'behind' other locals
     bss_buffer[0]  = 'a';
   	strcpy(bss_secret, data_secret);
@@ -235,7 +235,7 @@ perform_attack(
 
     switch (attack.location) {
         case STACK:
-            // NN: Special case for stack_struct
+            // Special case for stack_struct
             if (attack.code_ptr == STRUCT_FUNC_PTR_STACK &&
               attack.technique == DIRECT)
             {
@@ -243,13 +243,13 @@ perform_attack(
             } else if (attack.code_ptr == FUNC_PTR_STACK_PARAM &&
               attack.technique == DIRECT)
             {
-                // JM: use buffer lower in memory for direct attack
+                // use buffer lower in memory for direct attack
                 set_low_buf(&buffer);
             } else {
                 buffer = stack_buffer;
             }
 
-            // JM: enable data-only attack
+            // set up stack ptr with DOP target
             if (attack.inject_param == DATA_ONLY) {
                 stack_mem_ptr = &stack_flag;
             }
@@ -262,7 +262,7 @@ perform_attack(
         case HEAP:
             /* Injection into heap buffer                            */
 
-            // NN: Special case for heap_struct
+            // Special case for heap_struct
             if (attack.code_ptr == STRUCT_FUNC_PTR_HEAP &&
               attack.technique == DIRECT)
             {
@@ -297,7 +297,7 @@ perform_attack(
                 exit(1);
             }
 
-            // JM: set up heap ptr with DOP target
+            // set up heap ptr with DOP target
             if (attack.inject_param == DATA_ONLY) {
                 heap_mem_ptr = heap_flag;
             }
@@ -305,7 +305,7 @@ perform_attack(
         case DATA:
             /* Injection into data segment buffer                    */
 
-            // NN: Special case for stack_struct
+            // Special case for stack_struct
             if (attack.code_ptr == STRUCT_FUNC_PTR_DATA) {
                 buffer = data_struct.buffer;
                 break;
@@ -320,7 +320,7 @@ perform_attack(
                 buffer = data_buffer1;
             }
 
-            // JM: set up data ptr with DOP target
+            // set up data ptr with DOP target
             if (attack.inject_param == DATA_ONLY) {
                 data_flag     = 0;
                 *data_mem_ptr = &data_flag;
@@ -333,7 +333,7 @@ perform_attack(
         case BSS:
             /* Injection into BSS buffer                             */
 
-            // NN: Special case for bss_struct
+            // Special case for bss_struct
             if (attack.code_ptr == STRUCT_FUNC_PTR_BSS) {
                 buffer = bss_struct.buffer;
                 break;
@@ -346,7 +346,7 @@ perform_attack(
             bss_mem_ptr_aux = &dummy_function;
             bss_mem_ptr     = &dummy_function;
 
-            // JM: set up bss ptr with DOP target
+            // set up bss ptr with DOP target
             if (attack.inject_param == DATA_ONLY) {
                 bss_mem_ptr = &bss_flag;
             }
@@ -410,7 +410,7 @@ perform_attack(
                     target_addr = &bss_struct.func_ptr;
                     break;
                 case VAR_BOF:
-                // JM: if data-only, location determines target
+                // if data-only, location determines target
                 case VAR_IOF:
                     switch (attack.location) {
                         case STACK:
@@ -522,7 +522,7 @@ perform_attack(
         case DIRECT:
             switch (attack.inject_param) {
                 case RETURN_INTO_LIBC:
-                    // JM: simulate ret2libc by invoking mock libc function
+                    // simulate ret2libc by invoking mock libc function
                     payload.overflow_ptr = &ret2libc_target;
                     break;
                 case RETURN_ORIENTED_PROGRAMMING:
@@ -534,7 +534,7 @@ perform_attack(
                     payload.overflow_ptr = buffer;
                     break;
                 case DATA_ONLY:
-                    // JM: corrupt variable with nonzero value
+                    // corrupt variable with nonzero value
                     payload.overflow_ptr = 0xdeadbeef;
                     break;
                 default:
@@ -594,7 +594,7 @@ perform_attack(
                 case LONGJMP_BUF_BSS:
                     payload.overflow_ptr = bss_jmp_buffer;
                     break;
-				// JM: indirect attacks don't apply to int overflows or leaks
+				// indirect attacks don't apply to int overflows or leaks
                 case VAR_BOF:
                 case VAR_IOF:
 				case VAR_LEAK:
@@ -695,14 +695,14 @@ perform_attack(
             /* Code pointer already overwritten */
             break;
         case INDIRECT:
-            // JM: zero out junk byte written to general pointer
+            // zero out junk byte written to general pointer
             if (attack.function == SSCANF) {
                 *(uint32_t *) target_addr <<= 8;
                 *(uint32_t *) target_addr >>= 8;
             }
 
             if (attack.inject_param == RETURN_INTO_LIBC) {
-                // JM: auxilliary overflow to give attacker control of a second general ptr
+                // auxilliary overflow to give attacker control of a second general ptr
                 payload.overflow_ptr = &ret2libc_target;
                 payload.size         = (uintptr_t) target_addr_aux
                   - (uintptr_t) buffer + sizeof(long) + 1;
@@ -831,12 +831,12 @@ build_payload(CHARPAYLOAD * payload)
             size_shellcode = size_shellcode_nonop;
             break;
         case DATA_ONLY:
-            // JM: 256 padding bytes for unsigned 8bit IOF
+            // 256 padding bytes for unsigned 8bit IOF
             if (attack.code_ptr == VAR_IOF)
                 payload->size = 256 + sizeof(long) + sizeof(char);
 			
 			if (attack.code_ptr == VAR_LEAK) {
-				// JM: simulated packet with length included
+				// simulated packet with length included
 				payload->size += 32 - sizeof(long);
 				payload->buffer[0] = payload->size & 0xFF;
 				payload->buffer[1] = payload->size / 0x100;
@@ -895,7 +895,7 @@ build_payload(CHARPAYLOAD * payload)
 	
 } /* build_payload */
 
-// JM: call longjmp on a buffer in perform_attack()
+// call longjmp on a buffer in perform_attack()
 void
 lj_func(jmp_buf lj_buf)
 {
@@ -1259,7 +1259,7 @@ is_attack_possible()
     	return FALSE;
 	}
 
-    // JM: attacks targeting another memory location must be indirect
+    // attacks targeting another memory location must be indirect
     switch (attack.location) {
         case STACK:
             if ((attack.technique == DIRECT)) {
