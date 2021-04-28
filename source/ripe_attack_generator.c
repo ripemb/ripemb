@@ -15,6 +15,7 @@
 #include "ripe_attack_generator.h"
 
 static boolean output_debug_info = FALSE;
+#define print_reason(s) // fprintf(stderr, s)
 
 // JM: shellcode is generated in perform_attack()
 char * shellcode_nonop[12];
@@ -1222,16 +1223,14 @@ is_attack_possible()
     if ((attack.inject_param == INJECTED_CODE_NO_NOP) &&
       (!(attack.function == MEMCPY) && !(attack.function == HOMEBREW)))
     {
-        fprintf(stderr,
-          "Error: Impossible to inject shellcode with string functions (for now)\n");
+        print_reason("Error: Impossible to inject shellcode with string functions (for now)\n");
         return FALSE;
     }
 
     if (attack.inject_param == RETURN_ORIENTED_PROGRAMMING &&
       attack.technique != DIRECT)
     {
-        fprintf(stderr,
-          "Error: Impossible (theoretically) to perform indirect ROP attacks\n");
+        print_reason("Error: Impossible (theoretically) to perform indirect ROP attacks\n");
         return FALSE;
     }
 
@@ -1240,26 +1239,23 @@ is_attack_possible()
           	attack.code_ptr != VAR_IOF &&
 			attack.code_ptr != VAR_LEAK)
         {
-            fprintf(stderr, "Error: Misused DOP code pointer parameters.\n");
+            print_reason("Error: Misused DOP code pointer parameters.\n");
 			return FALSE;
         }
 
         if ((attack.code_ptr == VAR_LEAK || attack.code_ptr == VAR_IOF) && attack.technique == INDIRECT) {
-            fprintf(stderr,
-              "Error: Impossible to do an indirect int overflow attack.\n");
+            print_reason("Error: Impossible to do an indirect int overflow attack.\n");
 			return FALSE;
         }
 
         if (attack.location == HEAP && attack.technique == INDIRECT) {
-            fprintf(stderr,
-              "Error: Impossible to indirect attack the heap flag.\n");
+            print_reason("Error: Impossible to indirect attack the heap flag.\n");
         	return FALSE;
 		}
     } else if (attack.code_ptr == VAR_BOF ||
 			   attack.code_ptr == VAR_IOF ||
 			   attack.code_ptr == VAR_LEAK) {
-        fprintf(stderr,
-          "Error: Must use \"dataonly\" injection parameter for DOP attacks.\n");
+        print_reason("Error: Must use \"dataonly\" injection parameter for DOP attacks.\n");
     	return FALSE;
 	}
 
@@ -1277,8 +1273,7 @@ is_attack_possible()
                   (attack.code_ptr == STRUCT_FUNC_PTR_DATA) ||
                   (attack.code_ptr == STRUCT_FUNC_PTR_BSS) )
                 {
-                    fprintf(stderr,
-                      "Error: Impossible to perform a direct attack on the stack into another memory segment.\n");
+                    print_reason("Error: Impossible to perform a direct attack on the stack into another memory segment.\n");
                     return FALSE;
                 } else if ((attack.code_ptr == FUNC_PTR_STACK_PARAM) &&
                   ((attack.function == STRCAT) ||
@@ -1286,8 +1281,7 @@ is_attack_possible()
                   (attack.function == SSCANF) ||
                   (attack.function == HOMEBREW)))
                 {
-                    fprintf(stderr,
-                      "Error: Impossible to attack the stack parameter directly with the following functions: strcat(), snprintf(), sscanf(), homebrew_memcpy()\n");
+                    print_reason("Error: Impossible to attack the stack parameter directly with the following functions: strcat(), snprintf(), sscanf(), homebrew_memcpy()\n");
                     return FALSE;
                 }
             }
@@ -1308,8 +1302,7 @@ is_attack_possible()
               (attack.code_ptr == STRUCT_FUNC_PTR_DATA) ||
               (attack.code_ptr == STRUCT_FUNC_PTR_BSS) ))
             {
-                fprintf(stderr,
-                  "Error: Impossible to perform a direct attack on the heap into another memory segment.\n");
+                print_reason("Error: Impossible to perform a direct attack on the heap into another memory segment.\n");
                 return FALSE;
             }
             break;
@@ -1329,8 +1322,7 @@ is_attack_possible()
               (attack.code_ptr == STRUCT_FUNC_PTR_HEAP) ||
               (attack.code_ptr == STRUCT_FUNC_PTR_BSS) ))
             {
-                fprintf(stderr,
-                  "Error: Impossible to perform a direct attack on the data segment into another memory segment.\n");
+                print_reason("Error: Impossible to perform a direct attack on the data segment into another memory segment.\n");
                 return FALSE;
             }
             break;
@@ -1351,8 +1343,7 @@ is_attack_possible()
               (attack.code_ptr == STRUCT_FUNC_PTR_HEAP) ||
               (attack.code_ptr == STRUCT_FUNC_PTR_DATA) ))
             {
-                fprintf(stderr,
-                  "Error: Impossible to perform a direct attack on the bss into another memory segment.\n");
+                print_reason("Error: Impossible to perform a direct attack on the bss into another memory segment.\n");
                 return FALSE;
             } else if ((attack.technique == INDIRECT) &&
               (attack.code_ptr == LONGJMP_BUF_HEAP) &&
@@ -1360,8 +1351,7 @@ is_attack_possible()
               !(attack.function == STRNCPY) &&
               !(attack.function == HOMEBREW)))
             {
-                fprintf(stderr,
-                  "Error: Impossible to perform BSS->Heap Longjmp attacks using string functions.\n");
+                print_reason("Error: Impossible to perform BSS->Heap Longjmp attacks using string functions.\n");
                 return FALSE;
             }
             break;
