@@ -171,18 +171,17 @@ perform_attack(
     Function pointer array
     Longjmp buffer
     */
-    struct attackme * heap_struct =
-      (struct attackme *) malloc(sizeof(struct attackme));
+    struct attackme * heap_struct = malloc(sizeof(struct attackme));
     heap_struct->func_ptr = dummy_function;
 
     /* Two buffers declared to be able to chose buffer that gets allocated    */
     /* first on the heap. The other buffer will be set as a target, i.e. a    */
     /* heap array of function pointers.                                       */
-    char * heap_buffer1 = (char *) malloc(256 + sizeof(long));
-    char * heap_buffer2 = (char *) malloc(256 + sizeof(long));
-    char * heap_buffer3 = (char *) malloc(256 + sizeof(long));
+    char * heap_buffer1 = malloc(256 + sizeof(long));
+    char * heap_buffer2 = malloc(256 + sizeof(long));
+    char * heap_buffer3 = malloc(256 + sizeof(long));
 
-    int * heap_flag = (int *) malloc(sizeof(int *));
+    int * heap_flag = malloc(sizeof(int *));
     long * heap_mem_ptr_aux;
     long * heap_mem_ptr;
     char * heap_secret;
@@ -854,7 +853,7 @@ build_payload(CHARPAYLOAD * payload)
             break;
     }
     /* Allocate payload buffer */
-    payload->buffer = (char *) malloc(payload->size);
+    payload->buffer = malloc(payload->size);
     if (payload->buffer == NULL) {
         if (output_debug_info)
             perror("Unable to allocate payload buffer.");
@@ -969,7 +968,7 @@ iof(char * buf, uint32_t iv)
     uint8_t len  = strlen(buf);
 
     // 0-length allocation and vulenrable hash operations
-    map      = (char *) malloc(len * sizeof(char));
+    map      = malloc(len * sizeof(char));
     key     -= (uint32_t) map;
     key     &= (uint16_t) len - 1;
     map[key] = 0xa1;
