@@ -218,12 +218,6 @@ perform_attack(
     /* Attack payload */
     CHARPAYLOAD payload;
 
-    /* Check that malloc went fine */
-    if (heap_buffer1 == NULL || heap_buffer2 == NULL) {
-        perror("Unable to allocate heap memory.");
-        exit(1);
-    }
-
     // assigning value to bss buffers
     //  to place them 'behind' other locals
     bss_buffer[0]  = 'a';
@@ -854,11 +848,6 @@ build_payload(CHARPAYLOAD * payload)
     }
     /* Allocate payload buffer */
     payload->buffer = malloc(payload->size);
-    if (payload->buffer == NULL) {
-        if (output_debug_info)
-            perror("Unable to allocate payload buffer.");
-        return FALSE;
-    }
 
     /* Copy shellcode into payload buffer */
     memcpy(payload->buffer, shellcode, size_shellcode);
