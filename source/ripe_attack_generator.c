@@ -23,6 +23,14 @@ char * shellcode_nonop[12];
 // data-only target pointer
 uint32_t dop_dest = 0xdeadbeef;
 
+// For RETURN_ORIENTED_PROGRAMMING we skip over the prologue code of
+// rop_target() to simulate return-oriented programming gadget
+#ifdef __riscv_compressed
+  #define PROLOGUE_LENGTH 8
+#else
+  #define PROLOGUE_LENGTH 16
+#endif
+
 // Do not count for the null terminator since a null in the shellcode will
 // terminate any string function in the standard library
 static size_t size_shellcode_nonop = 12;
@@ -518,9 +526,7 @@ perform_attack(
                     payload.overflow_ptr = &ret2libc_target;
                     break;
                 case RETURN_ORIENTED_PROGRAMMING:
-                    // skip over the prologue code of rop_target
-                    // to simulate return-oriented programming gadget
-                    payload.overflow_ptr = (uintptr_t) &rop_target + 16;
+                    payload.overflow_ptr = (void *)((uintptr_t)&rop_target + PROLOGUE_LENGTH);
                     break;
                 case INJECTED_CODE_NO_NOP:
                     payload.overflow_ptr = buffer;
@@ -932,8 +938,9 @@ dop_target(char * buf, uint32_t auth)
     }
 }
 
+__attribute__ ((optimize (0))) // Make sure prologue length does not change
 void
-rop_target()
+rop_target(void)
 {
     printf("success.\nROP function reached.\n");
     exit(0);
