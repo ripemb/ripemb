@@ -1042,16 +1042,11 @@ build_shellcode(char * shellcode)
     }
 } /* build_shellcode */
 
-// convert a 32-bit hex value to padded, 8-char string
+// convert a 32-bit hex value to 0-padded, 8-char string
 void
 hex_to_string(char * str, size_t val)
 {
-    // store value in string and prepend 0s as necessary
-    snprintf(str, 9, "%8x", val);
-
-    for (int i = 0; i < 9; i++) {
-        if (str[i] == ' ') str[i] = '0';
-    }
+    snprintf(str, 9, "%08zx", val);
 }
 
 // format instruction and append to destination string
