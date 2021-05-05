@@ -25,6 +25,8 @@
 #define ATTACK_IMPOSSIBLE -900
 #define ATTACK_NOT_IMPLEMENTED -909
 
+#define ARR_ELEMS(a) (sizeof(a)/sizeof(a[0]))
+
 /* Enumerations for typing of attack form parameters                        */
 /* Each enumeration has its own integer space to provide better type safety */
 enum techniques    {DIRECT=100, INDIRECT};
@@ -42,15 +44,14 @@ enum functions     {MEMCPY=500, STRCPY, STRNCPY, SPRINTF, SNPRINTF,
                     STRCAT, STRNCAT, SSCANF, HOMEBREW};
 
 /* 2 overflow techniques */
-size_t nr_of_techniques = 2;
 char *opt_techniques[] = {"direct", "indirect"};
+size_t nr_of_techniques = ARR_ELEMS(opt_techniques);
 
 /* 4 types of injection parameters */
-size_t nr_of_inject_params = 4;
 char *opt_inject_params[] = {"shellcode", "returnintolibc", "rop", "dataonly"};
+size_t nr_of_inject_params = ARR_ELEMS(opt_inject_params);
 
 /* 18 code pointers to overwrite */
-size_t nr_of_code_ptrs = 18;
 char *opt_code_ptrs[] = {"ret", "funcptrstackvar", "funcptrstackparam",
                          "funcptrheap", "funcptrbss", "funcptrdata",
                          "longjmpstackvar", "longjmpstackparam",
@@ -58,14 +59,15 @@ char *opt_code_ptrs[] = {"ret", "funcptrstackvar", "funcptrstackparam",
                          "structfuncptrstack","structfuncptrheap",
                          "structfuncptrdata","structfuncptrbss",
                          "bof", "iof", "leak"};
+size_t nr_of_code_ptrs = ARR_ELEMS(opt_code_ptrs);
 
 /* 4 memory locations */
-size_t nr_of_locations = 4;
 char *opt_locations[] = {"stack", "heap", "bss", "data"};
+size_t nr_of_locations = ARR_ELEMS(opt_locations);
 
 /* 9 vulnerable functions */
-size_t nr_of_funcs = 10;
 char *opt_funcs[] = {"memcpy", "strcpy", "strncpy", "sprintf", "snprintf",
                      "strcat", "strncat", "sscanf", "homebrew"};
+size_t nr_of_funcs = ARR_ELEMS(opt_funcs);
 
 #endif /* !RIPE_ATTACK_PARAMETERS_H */
