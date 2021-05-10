@@ -61,17 +61,13 @@ struct payload {
         char *buffer;
 
         jmp_buf *jmp_buffer;
-
-        long stack_jmp_buffer_param;
-        size_t offset_to_copied_base_ptr;
-        size_t offset_to_fake_return_addr;
-        long *fake_return_addr;
-        long *ptr_to_correct_return_addr;
 };
 
+typedef void (func_t)(void);
+#define STRUCT_BUF_SIZE 256
 struct attackme {
-        char buffer[256];
-        int (*func_ptr)(const char *, int);
+        uint8_t buffer[STRUCT_BUF_SIZE];
+        func_t * func_ptr;
 };
 
 /**
@@ -131,7 +127,7 @@ bool set_location(char *choice, enum locations *l);
 bool set_function(char *choice, enum functions *f);
 
 
-bool is_attack_possible();
+bool is_attack_possible(void);
 void homebrew_memcpy(void *dst, const void *src, size_t len);
 
 /*
@@ -164,7 +160,6 @@ The shellcode is formatted so that:
   1. All instructions are stored to a single string
   1. Byte order is converted to little-endian
 */
-void build_shellcode(char *shellcode);
-void format_instruction(char *dest, size_t insn);
+void build_shellcode(uint8_t *shellcode);
 
 #endif /* !RIPE_ATTACK_GENERATOR_H */
