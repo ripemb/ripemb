@@ -9,7 +9,7 @@ endif
 
 #Depending on how you test your system you may want to comment, or uncomment
 #the following
-CFLAGS= -fno-stack-protector -z execstack
+CFLAGS += -fno-stack-protector -z execstack
 
 all: ripe_attack_generator
 
@@ -19,4 +19,4 @@ clean:
 ripe_attack_generator: ./source/ripe_attack_generator.c
 	mkdir -p build/ out/
 	$(CC) \
-		./source/ripe_attack_generator.c -o ./build/ripe_attack_generator
+		$^ $(CFLAGS) -o ./build/ripe_attack_generator
