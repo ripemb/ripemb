@@ -1,11 +1,15 @@
 # Makefile for RIPE
-# @author John Wilander & Nick Nikiforakis
-# Modified for RISC-V by John Merrill
+
+# Set compiler if need be:
+# default to riscv32 but allow it to be overridden too
+ifeq ($(origin CC),default)
+  CC = riscv32-unknown-elf-gcc
+  export CC
+endif
 
 #Depending on how you test your system you may want to comment, or uncomment
 #the following
 CFLAGS= -fno-stack-protector -z execstack
-CC=riscv64-unknown-elf-gcc
 
 all: ripe_attack_generator
 
