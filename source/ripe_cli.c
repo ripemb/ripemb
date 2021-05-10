@@ -41,7 +41,7 @@ const char * const opt_funcs[] = {"memcpy", "strcpy", "strncpy", "sprintf", "snp
 size_t nr_of_funcs = ARR_ELEMS(opt_funcs);
 
 #ifndef RIPE_NO_CLI
-int parse_ripe_params(int argc, char ** argv, struct attack_form *attack, boolean *debug) {
+int parse_ripe_params(int argc, char ** argv, struct attack_form *attack, bool *debug) {
     int rv = 0;
     int c;
     while ((c = getopt(argc, argv, "t:i:c:l:f:d")) != -1) {
@@ -77,7 +77,7 @@ int parse_ripe_params(int argc, char ** argv, struct attack_form *attack, boolea
     return rv;
 }
 
-boolean
+bool
 set_technique(char * choice, enum techniques *t)
 {
     if (strcmp(choice, opt_techniques[0]) == 0) {
@@ -92,7 +92,7 @@ set_technique(char * choice, enum techniques *t)
     return 0;
 }
 
-boolean
+bool
 set_inject_param(char * choice, enum inject_params *i)
 {
     if (strcmp(choice, opt_inject_params[0]) == 0) {
@@ -112,7 +112,7 @@ set_inject_param(char * choice, enum inject_params *i)
     return 0;
 }
 
-boolean
+bool
 set_code_ptr(char * choice, enum code_ptrs *c)
 {
     if (strcmp(choice, opt_code_ptrs[0]) == 0) {
@@ -159,7 +159,7 @@ set_code_ptr(char * choice, enum code_ptrs *c)
     return 0;
 } /* set_code_ptr */
 
-boolean
+bool
 set_location(char * choice, enum locations *l)
 {
     if (strcmp(choice, opt_locations[0]) == 0) {
@@ -178,7 +178,7 @@ set_location(char * choice, enum locations *l)
     return 0;
 }
 
-boolean
+bool
 set_function(char * choice, enum functions *f)
 {
     if (strcmp(choice, opt_funcs[0]) == 0) {

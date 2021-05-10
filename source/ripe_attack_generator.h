@@ -22,23 +22,10 @@
 #ifndef RIPE_ATTACK_GENERATOR_H
 #define RIPE_ATTACK_GENERATOR_H
 
-#include <unistd.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdarg.h>
-#include <limits.h>
 #include <stdint.h>
 #include <setjmp.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <inttypes.h>
-
-typedef int boolean;
-enum booleans {FALSE=0, TRUE};
-
-extern boolean output_debug_info;
+#include <stdlib.h>
+#include <stdbool.h>
 
 #define ARR_ELEMS(a) (sizeof(a)/sizeof(a[0]))
 
@@ -58,7 +45,6 @@ enum locations     {STACK=400, HEAP, BSS, DATA};
 enum functions     {MEMCPY=500, STRCPY, STRNCPY, SPRINTF, SNPRINTF,
                     STRCAT, STRNCAT, SSCANF, HOMEBREW};
 
-typedef struct attack_form ATTACK_FORM;
 struct attack_form {
         enum techniques technique;
         enum inject_params inject_param;
@@ -66,10 +52,8 @@ struct attack_form {
         enum locations location;
         enum functions function;
 };
-extern ATTACK_FORM attack;
 
-typedef struct char_payload CHARPAYLOAD;
-struct char_payload {
+struct payload {
         enum inject_params inject_param;
         size_t size;
         void *overflow_ptr; /* Points to code pointer (direct attack) */
@@ -91,7 +75,6 @@ struct attackme {
 };
 
 /**
- * main
  * -t technique
  * -i injection parameter
  * -c code pointer
@@ -99,9 +82,8 @@ struct attackme {
  * -f function to overflow with
  * -d output debug info
  */
-int parse_ripe_params(int argc, char ** argv, struct attack_form *attack, boolean *debug);
+int parse_ripe_params(int argc, char ** argv, struct attack_form *attack, bool *debug);
 
-int main(int argc, char **argv);
 extern const char * const opt_techniques[];
 extern size_t nr_of_techniques;
 extern const char * const opt_inject_params[];
@@ -140,16 +122,16 @@ extern size_t nr_of_funcs;
 /* This means that we should pad with                               */
 /* size - size_sc - size_addr - size_null = 31-12-4-1 = 14 bytes    */
 /* and start the padding at index size_sc                           */
-boolean build_payload(CHARPAYLOAD *payload);
+bool build_payload(struct payload *payload);
 
-boolean set_technique(char *choice, enum techniques *t);
-boolean set_inject_param(char *choice, enum inject_params *i);
-boolean set_code_ptr(char *choice, enum code_ptrs *c);
-boolean set_location(char *choice, enum locations *l);
-boolean set_function(char *choice, enum functions *f);
+bool set_technique(char *choice, enum techniques *t);
+bool set_inject_param(char *choice, enum inject_params *i);
+bool set_code_ptr(char *choice, enum code_ptrs *c);
+bool set_location(char *choice, enum locations *l);
+bool set_function(char *choice, enum functions *f);
 
 
-boolean is_attack_possible();
+bool is_attack_possible();
 void homebrew_memcpy(void *dst, const void *src, size_t len);
 
 /*

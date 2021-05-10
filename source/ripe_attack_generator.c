@@ -12,9 +12,16 @@
  *         sscanf, homebrew memcpy
  */
 
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+#include <setjmp.h>
+#include <inttypes.h>
+
 #include "ripe_attack_generator.h"
 
-boolean output_debug_info = FALSE;
+bool output_debug_info = false;
 #define print_reason(s) // fprintf(stderr, s)
 
 // shellcode is generated in perform_attack()
@@ -119,7 +126,7 @@ lj_func(jmp_buf lj_buf);
 #define OLD_BP_PTR   __builtin_frame_address(0)
 #define RET_ADDR_PTR ((void **) OLD_BP_PTR - 1)
 
-ATTACK_FORM attack;
+struct attack_form attack;
 
 int
 main(int argc, char ** argv)
@@ -242,7 +249,7 @@ perform_attack(
     /* Buffer for storing a generated format string */
     char format_string_buf[16];
     /* Attack payload */
-    CHARPAYLOAD payload;
+    struct payload payload;
 
     // assigning value to bss buffers
     //  to place them 'behind' other locals
@@ -834,8 +841,8 @@ perform_attack(
 /*******************/
 /* BUILD_PAYLOAD() */
 /*******************/
-boolean
-build_payload(CHARPAYLOAD * payload)
+bool
+build_payload(struct payload * payload)
 {
     size_t size_shellcode, bytes_to_pad;
     char * shellcode, * temp_char_buffer, * temp_char_ptr;
@@ -843,7 +850,7 @@ build_payload(CHARPAYLOAD * payload)
     switch (attack.inject_param) {
         case INJECTED_CODE_NO_NOP:
             if (payload->size < (size_shellcode_nonop + sizeof(long))) {
-                return FALSE;
+                return false;
             }
             shellcode      = shellcode_nonop;
             size_shellcode = size_shellcode_nonop;
@@ -861,12 +868,12 @@ build_payload(CHARPAYLOAD * payload)
                 payload->buffer[2] = 'A';
                 payload->buffer[3] = '\0';
                 payload->size = 4;
-                return TRUE;
-            }
+                return true;
+            } /* else fall through */
         case RETURN_ORIENTED_PROGRAMMING:
         case RETURN_INTO_LIBC:
             if (payload->size < sizeof(long))
-                return FALSE;
+                return false;
 
             size_shellcode = 0;
             shellcode      = "dummy";
@@ -903,7 +910,7 @@ build_payload(CHARPAYLOAD * payload)
     
     if (output_debug_info)
         fprintf(stderr, "payload: %s\n", payload->buffer);
-    return TRUE;
+    return true;
 
 } /* build_payload */
 
@@ -1099,21 +1106,21 @@ format_instruction(char * dest, size_t insn)
     }
 }
 
-boolean
+bool
 is_attack_possible()
 {
     if ((attack.inject_param == INJECTED_CODE_NO_NOP) &&
       (!(attack.function == MEMCPY) && !(attack.function == HOMEBREW)))
     {
         print_reason("Error: Impossible to inject shellcode with string functions (for now)\n");
-        return FALSE;
+        return false;
     }
 
     if (attack.inject_param == RETURN_ORIENTED_PROGRAMMING &&
       attack.technique != DIRECT)
     {
         print_reason("Error: Impossible (theoretically) to perform indirect ROP attacks\n");
-        return FALSE;
+        return false;
     }
 
     if (attack.inject_param == DATA_ONLY) {
@@ -1122,23 +1129,23 @@ is_attack_possible()
             attack.code_ptr != VAR_LEAK)
         {
             print_reason("Error: Misused DOP code pointer parameters.\n");
-            return FALSE;
+            return false;
         }
 
         if ((attack.code_ptr == VAR_LEAK || attack.code_ptr == VAR_IOF) && attack.technique == INDIRECT) {
             print_reason("Error: Impossible to do an indirect int overflow attack.\n");
-            return FALSE;
+            return false;
         }
 
         if (attack.location == HEAP && attack.technique == INDIRECT) {
             print_reason("Error: Impossible to indirect attack the heap flag.\n");
-            return FALSE;
+            return false;
         }
     } else if (attack.code_ptr == VAR_BOF ||
                attack.code_ptr == VAR_IOF ||
                attack.code_ptr == VAR_LEAK) {
         print_reason("Error: Must use \"dataonly\" injection parameter for DOP attacks.\n");
-        return FALSE;
+        return false;
     }
 
     // attacks targeting another memory location must be indirect
@@ -1156,15 +1163,15 @@ is_attack_possible()
                   (attack.code_ptr == STRUCT_FUNC_PTR_BSS) )
                 {
                     print_reason("Error: Impossible to perform a direct attack on the stack into another memory segment.\n");
-                    return FALSE;
                 } else if ((attack.code_ptr == FUNC_PTR_STACK_PARAM) &&
                   ((attack.function == STRCAT) ||
                   (attack.function == SNPRINTF) ||
                   (attack.function == SSCANF) ||
                   (attack.function == HOMEBREW)))
+                    return false;
                 {
                     print_reason("Error: Impossible to attack the stack parameter directly with the following functions: strcat(), snprintf(), sscanf(), homebrew_memcpy()\n");
-                    return FALSE;
+                    return false;
                 }
             }
             break;
@@ -1185,7 +1192,7 @@ is_attack_possible()
               (attack.code_ptr == STRUCT_FUNC_PTR_BSS) ))
             {
                 print_reason("Error: Impossible to perform a direct attack on the heap into another memory segment.\n");
-                return FALSE;
+                return false;
             }
             break;
 
@@ -1205,7 +1212,7 @@ is_attack_possible()
               (attack.code_ptr == STRUCT_FUNC_PTR_BSS) ))
             {
                 print_reason("Error: Impossible to perform a direct attack on the data segment into another memory segment.\n");
-                return FALSE;
+                return false;
             }
             break;
 
@@ -1225,18 +1232,18 @@ is_attack_possible()
               (attack.code_ptr == STRUCT_FUNC_PTR_DATA) ))
             {
                 print_reason("Error: Impossible to perform a direct attack on the bss into another memory segment.\n");
-                return FALSE;
             } else if ((attack.technique == INDIRECT) &&
               (attack.code_ptr == LONGJMP_BUF_HEAP) &&
               (!(attack.function == MEMCPY) &&
               !(attack.function == STRNCPY) &&
               !(attack.function == HOMEBREW)))
+                return false;
             {
                 print_reason("Error: Impossible to perform BSS->Heap Longjmp attacks using string functions.\n");
-                return FALSE;
+                return false;
             }
             break;
     }
 
-    return TRUE;
+    return true;
 } /* is_attack_possible */
