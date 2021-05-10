@@ -14,11 +14,27 @@
 
 #include "ripe_attack_generator.h"
 
-static boolean output_debug_info = FALSE;
+boolean output_debug_info = FALSE;
 #define print_reason(s) // fprintf(stderr, s)
 
 // shellcode is generated in perform_attack()
 char * shellcode_nonop[12];
+
+#ifndef RIPE_DEF_TECHNIQUE
+    #define RIPE_DEF_TECHNIQUE DIRECT
+#endif
+#ifndef RIPE_DEF_INJECT
+    #define RIPE_DEF_INJECT RETURN_ORIENTED_PROGRAMMING
+#endif
+#ifndef RIPE_DEF_CODE_PTR
+    #define RIPE_DEF_CODE_PTR RET_ADDR
+#endif
+#ifndef RIPE_DEF_LOCATION
+    #define RIPE_DEF_LOCATION STACK
+#endif
+#ifndef RIPE_DEF_FUNCTION
+    #define RIPE_DEF_FUNCTION MEMCPY
+#endif
 
 // data-only target pointer
 uint32_t dop_dest = 0xdeadbeef;
@@ -30,6 +46,19 @@ uint32_t dop_dest = 0xdeadbeef;
 #else
   #define PROLOGUE_LENGTH 16
 #endif
+
+static void attack_once(void);
+static int attack_wrapper(void);
+static int perform_attack(void (*stack_func_ptr_param)(void),
+                          jmp_buf *stack_jmp_buffer_param);
+static void dummy_function(void);
+static const char *hex_to_bin(char c);
+static void hex_to_string(char * str, size_t val);
+
+static const char * const bin4b[16] = {"0000", "0001", "0010", "0011",
+                                       "0100", "0101", "0110", "0111",
+                                       "1000", "1001", "1010", "1011",
+                                       "1100", "1101", "1110", "1111"};
 
 // Do not count for the null terminator since a null in the shellcode will
 // terminate any string function in the standard library
@@ -90,63 +119,52 @@ lj_func(jmp_buf lj_buf);
 #define OLD_BP_PTR   __builtin_frame_address(0)
 #define RET_ADDR_PTR ((void **) OLD_BP_PTR - 1)
 
-static ATTACK_FORM attack;
+ATTACK_FORM attack;
 
 int
 main(int argc, char ** argv)
 {
-    int option_char;
-    jmp_buf stack_jmp_buffer_param;
+    // Set defaults
+    attack.technique = RIPE_DEF_TECHNIQUE;
+    attack.inject_param = RIPE_DEF_INJECT;
+    attack.code_ptr = RIPE_DEF_CODE_PTR;
+    attack.location = RIPE_DEF_LOCATION;
+    attack.function = RIPE_DEF_FUNCTION;
 
-    // parse command line input
-    while ((option_char = getopt(argc, argv, "t:i:c:l:f:d")) != -1) {
-        switch (option_char) {
-            case 't':
-                set_technique(optarg);
-                break;
-            case 'i':
-                set_inject_param(optarg);
-                break;
-            case 'c':
-                set_code_ptr(optarg);
-                break;
-            case 'l':
-                set_location(optarg);
-                break;
-            case 'f':
-                set_function(optarg);
-                break;
-            case 'd':
-                output_debug_info = TRUE;
-                fprintf(stderr, "debug info enabled\n");
-                break;
-            default:
-                fprintf(stderr, "Error: Unknown command option \"%s\"\n",
-                  optarg);
-                exit(1);
-                break;
-        }
+#ifndef RIPE_NO_CLI
+    if (parse_ripe_params(argc, argv, &attack, &output_debug_info) != 0) {
+        fprintf(stderr, "Could not parse command line arguments\n");
+        return 1;
     }
-
-    // Check if attack is possible
-    if (is_attack_possible()) {
-        perform_attack(&dummy_function, stack_jmp_buffer_param);
-    } else {
-        exit(ATTACK_IMPOSSIBLE);
-    }
-
-    printf("Back in main\n");
-
+#endif
+    attack_once();
     return 0;
 } /* main */
+
+
+
+static void
+attack_once(void) {
+    if (is_attack_possible()) {
+        int ret = attack_wrapper();
+        fprintf(stderr, "attack_wrapper() returned %d\n", ret);
+        }
+}
+
+__attribute__ ((noinline)) // Make sure this function has its own stack frame
+static int
+attack_wrapper(void) {
+    jmp_buf stack_jmp_buffer_param;
+    return perform_attack(&dummy_function, &stack_jmp_buffer_param);
+}
 
 /********************/
 /* PERFORM_ATTACK() */
 /********************/
-void
+static int
 perform_attack(
-  int (*stack_func_ptr_param)(const char *),
-  jmp_buf stack_jmp_buffer_param)
+    void (*stack_func_ptr_param)(void),
+    jmp_buf *stack_jmp_buffer_param)
 {
     jmp_buf stack_jmp_buffer;
 
@@ -476,20 +494,21 @@ perform_attack(
                 /* setjmp() returns 0 if returning directly and non-zero when returning */
                 /* from longjmp() using the saved context. Attack failed.               */
                 printf("Longjmp attack failed. Returning normally...\n");
-                return;
+                return 1;
             }
             payload.jmp_buffer = &stack_jmp_buffer;
             break;
         case LONGJMP_BUF_STACK_PARAM:
             if (setjmp(stack_jmp_buffer_param) != 0) {
                 printf("Longjmp attack failed. Returning normally...\n");
+                return 1;
             }
             payload.jmp_buffer = &stack_jmp_buffer_param;
             break;
         case LONGJMP_BUF_HEAP:
             if (setjmp(*heap_jmp_buffer) != 0) {
                 printf("Longjmp attack failed. Returning normally...\n");
-                return;
+                return 1;
             }
             payload.jmp_buffer = (void *) heap_jmp_buffer;
             payload.stack_jmp_buffer_param = NULL;
@@ -497,7 +516,7 @@ perform_attack(
         case LONGJMP_BUF_DATA:
             if (setjmp(data_jmp_buffer) != 0) {
                 printf("Longjmp attack failed. Returning normally...\n");
-                return;
+                return 1;
             }
             payload.jmp_buffer = (void *) data_jmp_buffer;
             payload.stack_jmp_buffer_param = NULL;
@@ -505,7 +524,7 @@ perform_attack(
         case LONGJMP_BUF_BSS:
             if (setjmp(bss_jmp_buffer) != 0) {
                 printf("Longjmp attack failed. Returning normally...\n");
-                return;
+                return 1;
             }
             payload.jmp_buffer = (void *) bss_jmp_buffer;
             payload.stack_jmp_buffer_param = NULL;
@@ -809,6 +828,7 @@ perform_attack(
             data_leak(buffer);
             break;
     }
+    return 1;
 } /* perform_attack */
 
 /*******************/
@@ -886,6 +906,11 @@ build_payload(CHARPAYLOAD * payload)
     return TRUE;
 
 } /* build_payload */
+
+static void
+dummy_function(void) {
+    printf("Dummy function\n");
+}
 
 // call longjmp on a buffer in perform_attack()
 void
@@ -1042,8 +1067,17 @@ build_shellcode(char * shellcode)
     }
 } /* build_shellcode */
 
+static const char *
+hex_to_bin(char c) {
+    if (c >= '0' && c <= '9')
+        return bin4b[c - '0'];
+    if (c >= 'a' && c <= 'f')
+        return bin4b[10 + c - 'a'];
+    return NULL;
+}
+
 // convert a 32-bit hex value to 0-padded, 8-char string
-void
+static void
 hex_to_string(char * str, size_t val)
 {
     snprintf(str, 9, "%08zx", val);
@@ -1063,146 +1097,6 @@ format_instruction(char * dest, size_t insn)
     for (int i = 3; i >= 0; i--) {
         dest[3 - i] = insn_bytes[i];
     }
-}
-
-void
-set_technique(char * choice)
-{
-    if (strcmp(choice, opt_techniques[0]) == 0) {
-        attack.technique = DIRECT;
-    } else if (strcmp(choice, opt_techniques[1]) == 0) {
-        attack.technique = INDIRECT;
-    } else {
-        if (output_debug_info) {
-            fprintf(stderr, "Error: Unknown choice of technique \"%s\"\n",
-              choice);
-        }
-    }
-    printf("tech: %d\n", attack.technique);
-}
-
-void
-set_inject_param(char * choice)
-{
-    if (strcmp(choice, opt_inject_params[0]) == 0) {
-        attack.inject_param = INJECTED_CODE_NO_NOP;
-    } else if (strcmp(choice, opt_inject_params[1]) == 0) {
-        attack.inject_param = RETURN_INTO_LIBC;
-    } else if (strcmp(choice, opt_inject_params[2]) == 0) {
-        attack.inject_param = RETURN_ORIENTED_PROGRAMMING;
-    } else if (strcmp(choice, opt_inject_params[3]) == 0) {
-        attack.inject_param = DATA_ONLY;
-    } else {
-        if (output_debug_info) {
-            fprintf(stderr,
-              "Error: Unknown choice of injection parameter \"%s\"\n",
-              choice);
-        }
-        exit(1);
-    }
-    printf("attack: %d\n", attack.inject_param);
-}
-
-void
-set_code_ptr(char * choice)
-{
-    if (strcmp(choice, opt_code_ptrs[0]) == 0) {
-        attack.code_ptr = RET_ADDR;
-    } else if (strcmp(choice, opt_code_ptrs[1]) == 0) {
-        attack.code_ptr = FUNC_PTR_STACK_VAR;
-    } else if (strcmp(choice, opt_code_ptrs[2]) == 0) {
-        attack.code_ptr = FUNC_PTR_STACK_PARAM;
-    } else if (strcmp(choice, opt_code_ptrs[3]) == 0) {
-        attack.code_ptr = FUNC_PTR_HEAP;
-    } else if (strcmp(choice, opt_code_ptrs[4]) == 0) {
-        attack.code_ptr = FUNC_PTR_BSS;
-    } else if (strcmp(choice, opt_code_ptrs[5]) == 0) {
-        attack.code_ptr = FUNC_PTR_DATA;
-    } else if (strcmp(choice, opt_code_ptrs[6]) == 0) {
-        attack.code_ptr = LONGJMP_BUF_STACK_VAR;
-    } else if (strcmp(choice, opt_code_ptrs[7]) == 0) {
-        attack.code_ptr = LONGJMP_BUF_STACK_PARAM;
-    } else if (strcmp(choice, opt_code_ptrs[8]) == 0) {
-        attack.code_ptr = LONGJMP_BUF_HEAP;
-    } else if (strcmp(choice, opt_code_ptrs[9]) == 0) {
-        attack.code_ptr = LONGJMP_BUF_BSS;
-    } else if (strcmp(choice, opt_code_ptrs[10]) == 0) {
-        attack.code_ptr = LONGJMP_BUF_DATA;
-    } else if (strcmp(choice, opt_code_ptrs[11]) == 0) {
-        attack.code_ptr = STRUCT_FUNC_PTR_STACK;
-    } else if (strcmp(choice, opt_code_ptrs[12]) == 0) {
-        attack.code_ptr = STRUCT_FUNC_PTR_HEAP;
-    } else if (strcmp(choice, opt_code_ptrs[13]) == 0) {
-        attack.code_ptr = STRUCT_FUNC_PTR_DATA;
-    } else if (strcmp(choice, opt_code_ptrs[14]) == 0) {
-        attack.code_ptr = STRUCT_FUNC_PTR_BSS;
-    } else if (strcmp(choice, opt_code_ptrs[15]) == 0) {
-        attack.code_ptr = VAR_BOF;
-    } else if (strcmp(choice, opt_code_ptrs[16]) == 0) {
-        attack.code_ptr = VAR_IOF;
-    } else if (strcmp(choice, opt_code_ptrs[17]) == 0) {
-        attack.code_ptr = VAR_LEAK;
-    } else {
-        if (output_debug_info) {
-            fprintf(stderr, "Error: Unknown choice of code pointer \"%s\"\n",
-              choice);
-        }
-        exit(1);
-    }
-    printf("code ptr: %d\n", attack.code_ptr);
-} /* set_code_ptr */
-
-void
-set_location(char * choice)
-{
-    if (strcmp(choice, opt_locations[0]) == 0) {
-        attack.location = STACK;
-    } else if (strcmp(choice, opt_locations[1]) == 0) {
-        attack.location = HEAP;
-    } else if (strcmp(choice, opt_locations[2]) == 0) {
-        attack.location = BSS;
-    } else if (strcmp(choice, opt_locations[3]) == 0) {
-        attack.location = DATA;
-    } else {
-        if (output_debug_info) {
-            fprintf(stderr, "Error: Unknown choice of memory location \"%s\"\n",
-              choice);
-        }
-        exit(1);
-    }
-    printf("location: %d\n", attack.location);
-}
-
-void
-set_function(char * choice)
-{
-    if (strcmp(choice, opt_funcs[0]) == 0) {
-        attack.function = MEMCPY;
-    } else if (strcmp(choice, opt_funcs[1]) == 0) {
-        attack.function = STRCPY;
-    } else if (strcmp(choice, opt_funcs[2]) == 0) {
-        attack.function = STRNCPY;
-    } else if (strcmp(choice, opt_funcs[3]) == 0) {
-        attack.function = SPRINTF;
-    } else if (strcmp(choice, opt_funcs[4]) == 0) {
-        attack.function = SNPRINTF;
-    } else if (strcmp(choice, opt_funcs[5]) == 0) {
-        attack.function = STRCAT;
-    } else if (strcmp(choice, opt_funcs[6]) == 0) {
-        attack.function = STRNCAT;
-    } else if (strcmp(choice, opt_funcs[7]) == 0) {
-        attack.function = SSCANF;
-    } else if (strcmp(choice, opt_funcs[8]) == 0) {
-        attack.function = HOMEBREW;
-    } else {
-        if (output_debug_info) {
-            fprintf(stderr,
-              "Error: Unknown choice of vulnerable function \"%s\"\n",
-              choice);
-        }
-        exit(1);
-    }
-    printf("function: %d\n", attack.function);
 }
 
 boolean

@@ -35,15 +35,28 @@
 #include <fcntl.h>
 #include <inttypes.h>
 
-#include "ripe_attack_parameters.h"
-
 typedef int boolean;
 enum booleans {FALSE=0, TRUE};
 
-const char *bin4b[16] = {"0000", "0001", "0010", "0011",
-                         "0100", "0101", "0110", "0111",
-                         "1000", "1001", "1010", "1011",
-                         "1100", "1101", "1110", "1111"};
+extern boolean output_debug_info;
+
+#define ARR_ELEMS(a) (sizeof(a)/sizeof(a[0]))
+
+/* Enumerations for typing of attack form parameters                        */
+/* Each enumeration has its own integer space to provide better type safety */
+enum techniques    {DIRECT=100, INDIRECT};
+enum inject_params {INJECTED_CODE_NO_NOP=200, RETURN_INTO_LIBC,
+                    RETURN_ORIENTED_PROGRAMMING, DATA_ONLY};
+
+enum code_ptrs     {RET_ADDR=300, FUNC_PTR_STACK_VAR, FUNC_PTR_STACK_PARAM,
+                    FUNC_PTR_HEAP, FUNC_PTR_BSS, FUNC_PTR_DATA,
+                    LONGJMP_BUF_STACK_VAR, LONGJMP_BUF_STACK_PARAM,
+                    LONGJMP_BUF_HEAP, LONGJMP_BUF_BSS, LONGJMP_BUF_DATA,
+                    STRUCT_FUNC_PTR_STACK,STRUCT_FUNC_PTR_HEAP,
+                    STRUCT_FUNC_PTR_DATA,STRUCT_FUNC_PTR_BSS, VAR_BOF, VAR_IOF, VAR_LEAK};
+enum locations     {STACK=400, HEAP, BSS, DATA};
+enum functions     {MEMCPY=500, STRCPY, STRNCPY, SPRINTF, SNPRINTF,
+                    STRCAT, STRNCAT, SSCANF, HOMEBREW};
 
 typedef struct attack_form ATTACK_FORM;
 struct attack_form {
@@ -53,6 +66,7 @@ struct attack_form {
         enum locations location;
         enum functions function;
 };
+extern ATTACK_FORM attack;
 
 typedef struct char_payload CHARPAYLOAD;
 struct char_payload {
@@ -79,18 +93,27 @@ struct attackme {
 /**
  * main
  * -t technique
- * -i injection parameter (code + NOP / return-into-libc / param to system())
+ * -i injection parameter
  * -c code pointer
  * -l memory location
  * -f function to overflow with
  * -d output debug info
- * -o set output stream
  */
-int main(int argc, char **argv);
+int parse_ripe_params(int argc, char ** argv, struct attack_form *attack, boolean *debug);
 
-void perform_attack(
-                    int (*stack_func_ptr_param)(const char *),
-                    jmp_buf stack_jmp_buffer_param);
+int main(int argc, char **argv);
+extern const char * const opt_techniques[];
+extern size_t nr_of_techniques;
+extern const char * const opt_inject_params[];
+extern size_t nr_of_inject_params;
+extern const char * const opt_code_ptrs[];
+extern size_t nr_of_code_ptrs;
+extern const char * const opt_locations[];
+extern size_t nr_of_locations;
+extern const char * const opt_funcs[];
+extern size_t nr_of_funcs;
+
+
 
 /* BUILD_PAYLOAD()                                                  */
 /*                                                                  */
@@ -119,16 +142,12 @@ void perform_attack(
 /* and start the padding at index size_sc                           */
 boolean build_payload(CHARPAYLOAD *payload);
 
-void set_technique(char *choice);
-void set_inject_param(char *choice);
-void set_code_ptr(char *choice);
-void set_location(char *choice);
-void set_function(char *choice);
+boolean set_technique(char *choice, enum techniques *t);
+boolean set_inject_param(char *choice, enum inject_params *i);
+boolean set_code_ptr(char *choice, enum code_ptrs *c);
+boolean set_location(char *choice, enum locations *l);
+boolean set_function(char *choice, enum functions *f);
 
-int dummy_function(const char *str) {
-        printf("Dummy function\n");
-        return 0;
-}
 
 boolean is_attack_possible();
 void homebrew_memcpy(void *dst, const void *src, size_t len);
@@ -164,15 +183,6 @@ The shellcode is formatted so that:
   1. Byte order is converted to little-endian
 */
 void build_shellcode(char *shellcode);
-void hex_to_string(char *str, size_t val);
 void format_instruction(char *dest, size_t insn);
-
-const char *hex_to_bin(char c) {
-    if (c >= '0' && c <= '9')
-        return bin4b[c - '0'];
-    if (c >= 'a' && c <= 'f')
-        return bin4b[10 + c - 'a'];
-    return NULL;
-}
 
 #endif /* !RIPE_ATTACK_GENERATOR_H */

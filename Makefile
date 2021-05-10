@@ -16,7 +16,7 @@ all: ripe_attack_generator
 clean:
 	rm -rf build/ out/
 
-ripe_attack_generator: ./source/ripe_attack_generator.c
+ripe_attack_generator: $(wildcard ./source/*.c)
 	mkdir -p build/ out/
 	$(CC) \
 		$^ $(CFLAGS) -o ./build/ripe_attack_generator
