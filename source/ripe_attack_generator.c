@@ -102,10 +102,6 @@ rop_target(void);
 void
 dop_target(uint8_t * buf, uint32_t auth);
 
-// contains buffer lower in memory than stack param, allowing for overflow
-void
-set_low_buf(uint8_t ** buf);
-
 // integer overflow vulnerability
 void
 iof(uint8_t * buf, uint32_t iv);
@@ -268,11 +264,6 @@ perform_attack(
               attack.technique == DIRECT)
             {
                 buffer = stack_struct.buffer;
-            } else if (attack.code_ptr == FUNC_PTR_STACK_PARAM &&
-              attack.technique == DIRECT)
-            {
-                // use buffer lower in memory for direct attack
-                set_low_buf(&buffer);
             } else {
                 buffer = stack_buffer;
             }
@@ -973,16 +964,6 @@ rop_target(void)
 {
     printf("success.\nROP function reached.\n");
     exit(0);
-}
-
-void
-set_low_buf(uint8_t ** buf)
-{
-    uint8_t low_buf[1024];
-
-    if (output_debug_info)
-        fprintf(stderr, "Inside set_low_buf()\n");
-    *buf = &low_buf;
 }
 
 void
