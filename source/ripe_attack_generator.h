@@ -126,6 +126,8 @@ enum RIPE_RET {
     RET_ERR,
 };
 
+extern struct ripe_globals g;
+
 extern jmp_buf control_jmp_buffer;
 /* longjmp implementation that does not enforce any security mechanism to
  * allow undisturbed returning via control_jmp_buffer. */
@@ -168,36 +170,16 @@ bool set_function(char *choice, enum functions *f);
 bool is_attack_possible(void);
 void homebrew_memcpy(void *dst, const void *src, size_t len);
 
-/*
-RIPE shellcode uses the following instructions:
-la <reg>, <addr of shellcode_func()>
-jalr <reg>
-
-The first la instruction is disassembled to:
-lui <reg>, <upper 20 bits>
-addi <reg>, <reg>, <lower 12 bits>
-
-Thus, the shellcode follows the pattern
-shown in the following encodings:
-
-LUI: xxxx xxxx xxxx xxxx xxxx xxxx x011 0111
-     \                  / \    /\      /
-             imm value         reg#  opcode
-
-
-ADDI: xxxx xxxx xxxx xxxx x000 xxxx x011 0011
-      \        / \    /    \    /\      /
-        imm value     reg#      reg#  opcode
-
-
-JALR: 0000 0000 0000 xxxx x000 0000 1110 0111
-                     \    /          \      /
-                      reg#            opcode
-
-The shellcode is formatted so that:
-  1. All instructions are stored to a single string
-  1. Byte order is converted to little-endian
-*/
 void build_shellcode(uint8_t **shellcode, size_t *size_shellcode);
+
+// control data destinations
+void
+shellcode_target(void);
+void
+ret2libc_target(void);
+void
+rop_target(void);
+void
+dop_target(uint32_t auth);
 
 #endif /* !RIPE_ATTACK_GENERATOR_H */
