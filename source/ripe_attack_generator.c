@@ -222,7 +222,7 @@ lj_func(jmp_buf lj_buf);
 void
 set_attack_indices(size_t t, size_t i, size_t c, size_t l, size_t f)
 {
-    printf("Trying %zd/%zd/%zd/%zd/%zd:  ", t, i, c, l, f);
+    printf("Trying %zu/%zu/%zu/%zu/%zu:  ", t, i, c, l, f);
     printf("%s/%s/%s/%s/%s\n", opt_techniques[t], opt_inject_params[i], opt_code_ptrs[c], opt_locations[l], opt_funcs[f]);
     g.attack.technique = 100 + t;
     g.attack.inject_param = 200 + i;
@@ -1060,7 +1060,7 @@ build_payload(struct payload * payload, ptrdiff_t offset)
     memset((payload->buffer + size_shellcode), 'A', bytes_to_pad);
 
     if (g.output_debug_info) {
-        fprintf(stderr, "bytes to pad: %zd\n", bytes_to_pad);
+        fprintf(stderr, "bytes to pad: %zu\n", bytes_to_pad);
         fprintf(stderr, "\noverflow_ptr: %p\n", payload->overflow_ptr);
     }
 
@@ -1091,7 +1091,7 @@ build_payload(struct payload * payload, ptrdiff_t offset)
     memset((payload->buffer + payload->size - 1), '\0', 1);
     
     if (g.output_debug_info)
-        fprintf(stderr, "payload of %d bytes created.\n", payload->size);
+        fprintf(stderr, "payload of %zu bytes created.\n", payload->size);
     return true;
 } /* build_payload */
 
@@ -1169,6 +1169,7 @@ iof(uint8_t * buf, uint32_t iv)
 
     // 0-length allocation and vulenrable hash operations
     map      = malloc(len * sizeof(uint8_t));
+    fprintf(stderr, "%s: allocated %zu B\n", __func__, len * sizeof(uint8_t));
     key     -= (uintptr_t) map;
     key     &= (uint16_t) len - 1;
     map[key] = 0xa1;
@@ -1184,7 +1185,7 @@ data_leak(uint8_t *buf) {
         fprintf(stderr, "malloc()ing data_leak buffer failed!\n");
         exit(1);
     }
-    fprintf(stderr, "%s: allocated %zd B\n", __func__, size);
+    fprintf(stderr, "%s: allocated %zu B\n", __func__, size);
 
     size_t common_len = strlen(SECRET_STRING_START);
     const char *loc_string;
