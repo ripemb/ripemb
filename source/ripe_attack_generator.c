@@ -51,7 +51,14 @@ static uint8_t shellcode_nonop[12];
 
 #define SECRET_STRING_START "Secret data "
 #define MAX_SECRET_LEN (32)
+#define BUF_LEN (256)
 
+#ifndef SETUP_PROTECTION
+    #define SETUP_PROTECTION() do{;}while(0)
+#endif
+#ifndef DISABLE_PROTECTION
+    #define DISABLE_PROTECTION() do{;}while(0)
+#endif
 static void attack_once(void);
 static enum RIPE_RET attack_wrapper(int no_attack);
 static enum RIPE_RET perform_attack(func_t **stack_func_ptr_param,
@@ -85,20 +92,17 @@ static struct {
 jmp_buf control_jmp_buffer; // We use long jmp to get back from attacks.
 
 static struct {
-    uint32_t dop_dest; // FIXME: make this global?
     /* DATA SEGMENT TARGETS
-        FIXME: sdata is not a thing - unless we can exploit it on some platform productively.
-        Overflow buffers (buffer1 for .data, buffer2 for .sdata)
-        Arbitrary read data
+        Overflow buffer
         DOP flag
-        Two general pointers for indirect attack
+        Arbitrary read data
+        General pointer for indirect attack
         Function pointer
         Longjmp buffer
     */
-    uint8_t data_buffer1[256];
-    uint8_t data_buffer2[8];
-    char data_secret[MAX_SECRET_LEN];
+    uint8_t data_buffer[BUF_LEN];
     uint32_t data_flag;
+    char data_secret[MAX_SECRET_LEN];
     void * data_mem_ptr;
     func_t * data_func_ptr;
     jmp_buf data_jmp_buffer;
@@ -107,9 +111,7 @@ static struct {
 static void
 init_d(void)
 {
-    d.dop_dest = 0xdeadc0de; // data-only target pointer
-    strcpy((char *)d.data_buffer1, "d");
-    strcpy((char *)d.data_buffer2, "dummy");
+    d.data_buffer[0] = '\0';
     strcpy((char *)d.data_secret, SECRET_STRING_START "DATA");
     d.data_flag = 0;
     d.data_mem_ptr = &dummy_function;
@@ -118,16 +120,16 @@ init_d(void)
 
 /* BSS TARGETS
     Overflow buffer
-    Arbitrary read data
     DOP flag
-    Two general pointers for indirect attack
+    Arbitrary read data
+    General pointer for indirect attack
     Function pointer
     Longjmp buffer
 */
 struct bss {
-    uint8_t bss_buffer[256];
-    char bss_secret[MAX_SECRET_LEN];
+    uint8_t bss_buffer[BUF_LEN];
     uint32_t bss_flag;
+    char bss_secret[MAX_SECRET_LEN];
     void * bss_mem_ptr;
     func_t * bss_func_ptr;
     jmp_buf bss_jmp_buffer;
@@ -144,25 +146,20 @@ init_bss(struct bss *b)
 }
 
 /* HEAP TARGETS
-    Overflow buffers
+    Overflow buffer + another heap buffer to store:
     DOP flag
-    Two general pointers for indirect attack
     Arbitrary read data
-    Function pointer array
+    General pointer for indirect attack
+    Function pointer
     Longjmp buffer
 */
 struct heap_targets {
-    // FIXME: "slightly" outdated. 3 buffers and no function pointer array
-    /* Two buffers declared to be able to chose buffer that gets allocated    */
-    /* first on the heap. The other buffer will be set as a target, i.e. a    */
-    /* heap array of function pointers.                                       */
     uint8_t * heap_buffer1;
     uint8_t * heap_buffer2;
-    uint8_t * heap_buffer3;
 
     uint32_t * heap_flag;
-    void * heap_mem_ptr;
     char * heap_secret;
+    void * heap_mem_ptr;
     func_t ** heap_func_ptr_ptr;
     jmp_buf * heap_jmp_buffer;
 };
@@ -250,7 +247,9 @@ main(int argc, char ** argv)
                         set_attack_indices(t, i, c, l, f);
 #else
 #endif
+                        SETUP_PROTECTION();
                         attack_once();
+                        DISABLE_PROTECTION();
                         restore_heap(g.heap_safe);
 #ifndef RIPE_DEF_ONLY
                     }
@@ -336,15 +335,15 @@ perform_attack(
     jmp_buf *stack_jmp_buffer_param)
 {
     /* STACK TARGETS
-        Function Pointer
-        Two general pointers for indirect attack
+        Overflow buffer
         DOP flag
         Arbitrary read data
-        Overflow buffer
+        General pointer for indirect attack
+        Function Pointer
         Long jump buffer
     */
     struct {
-        uint8_t stack_buffer[1024];
+        uint8_t stack_buffer[BUF_LEN];
         char stack_secret[MAX_SECRET_LEN];
         uint32_t stack_flag;
         void * stack_mem_ptr;
@@ -362,19 +361,17 @@ perform_attack(
     }
     memset(heap, 0, sizeof(struct heap_targets));
 
-    heap->heap_buffer1 = malloc(256 + sizeof(long));
-    heap->heap_buffer2 = malloc(256 + sizeof(long));
-    heap->heap_buffer3 = malloc(256 + sizeof(long));
-    heap->heap_flag = malloc(sizeof(int *));
+    heap->heap_buffer1 = malloc(BUF_LEN + sizeof(long));
+    heap->heap_buffer2 = malloc(BUF_LEN + sizeof(long));
     if (heap->heap_buffer1 == NULL ||
-        heap->heap_buffer2 == NULL ||
-        heap->heap_buffer3 == NULL ||
-        heap->heap_flag == NULL) {
+        heap->heap_buffer2 == NULL) {
         fprintf(stderr, "A heap malloc() failed!\n");
         exit(1);
     }
-    heap->heap_func_ptr_ptr = NULL;
-    heap->heap_flag = 0;
+    heap->heap_jmp_buffer = (jmp_buf *)heap->heap_buffer2;
+    heap->heap_func_ptr_ptr = (func_t **)heap->heap_buffer2;
+    heap->heap_flag = (uint32_t *)heap->heap_buffer2;
+    *heap->heap_flag = 0;
 
     static struct bss b;
     init_bss(&b);
@@ -399,23 +396,17 @@ perform_attack(
                 stack.stack_mem_ptr = (uint8_t *)&stack.stack_flag;
             }
 
-            // Also set the location of the function pointer and the
-            // longjmp buffer on the heap (the same since only choose one)
-            heap->heap_func_ptr_ptr   = (func_t **)(uintptr_t)heap->heap_buffer1;
-            heap->heap_jmp_buffer = (jmp_buf *)heap->heap_buffer1;
             break;
         case HEAP:
             /* Injection into heap buffer                            */
 
-            if (((uintptr_t) heap->heap_buffer1 < (uintptr_t) heap->heap_buffer2) &&
-              ((uintptr_t) heap->heap_buffer2 < (uintptr_t) heap->heap_buffer3))
+            if ((uintptr_t) heap->heap_buffer1 < (uintptr_t) heap->heap_buffer2)
             {
                 if (g.output_debug_info) {
                     fprintf(stderr,
-                      "heap buffers 1-3: 0x%0*" PRIxPTR ", 0x%0*" PRIxPTR ", 0x%0*" PRIxPTR ".\n",
+                      "heap buffers: 0x%0*" PRIxPTR ", 0x%0*" PRIxPTR ".\n",
                       PRIxPTR_WIDTH, (uintptr_t)heap->heap_buffer1,
-                      PRIxPTR_WIDTH, (uintptr_t)heap->heap_buffer2,
-                      PRIxPTR_WIDTH, (uintptr_t)heap->heap_buffer3);
+                      PRIxPTR_WIDTH, (uintptr_t)heap->heap_buffer2);
                 }
                 buffer = heap->heap_buffer1;
                 buf_name = "heap->heap_buffer1";
@@ -426,12 +417,6 @@ perform_attack(
                     heap->heap_secret = (char *)heap->heap_buffer2;
                     strcpy(heap->heap_secret, SECRET_STRING_START "HEAP");
                 }
-                // Also set the location of the function pointer and the
-                // longjmp buffer on the heap (the same since only choose one)
-                heap->heap_func_ptr_ptr = (func_t **)(uintptr_t)heap->heap_buffer3;
-
-                // allocate the jump buffer
-                heap->heap_jmp_buffer = (jmp_buf *)heap->heap_buffer3;
             } else {
                 if (g.output_debug_info) {
                     fprintf(stderr,
@@ -448,24 +433,13 @@ perform_attack(
         case DATA:
             /* Injection into data segment buffer                    */
 
-            if ((g.attack.code_ptr == FUNC_PTR_DATA ||
-              g.attack.code_ptr == VAR_BOF) &&
-              g.attack.technique == DIRECT)
-            {
-                buffer = d.data_buffer2;
-                buf_name = "d.data_buffer2";
-            } else {
-                buffer = d.data_buffer1;
-                buf_name = "d.data_buffer1";
-            }
+            buffer = d.data_buffer;
+            buf_name = "d.data_buffer";
 
             // set up data ptr with DOP target
             if (g.attack.inject_param == DATA_ONLY) {
                 d.data_mem_ptr = &d.data_flag;
             }
-            // Also set the location of the function pointer and the
-            // longjmp buffer on the heap (the same since only choose one)
-            heap->heap_jmp_buffer = (jmp_buf *)heap->heap_buffer1;
             break;
         case BSS:
             /* Injection into BSS buffer                             */
@@ -483,10 +457,6 @@ perform_attack(
             break;
     }
 
-    // make sure we actually have an initialized function pointer on the heap
-    if (heap->heap_func_ptr_ptr != NULL)
-        *heap->heap_func_ptr_ptr = &dummy_function;
-
     // Set Target Address
             switch (g.attack.code_ptr) {
                 case RET_ADDR:
@@ -502,6 +472,7 @@ perform_attack(
                     target_name = "stack_func_ptr_param";
                     break;
                 case FUNC_PTR_HEAP:
+                    *heap->heap_func_ptr_ptr = &dummy_function;
                     target_addr = heap->heap_func_ptr_ptr;
                     target_name = "heap->heap_func_ptr_ptr";
                     break;
