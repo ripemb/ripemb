@@ -76,6 +76,9 @@ static struct {
     struct attack_form attack;
     struct payload payload;
     uint8_t heap_safe[RIPE_HEAP_SAFE_SIZE];
+    /* Store target address after and before overflowing for debugging */
+    uintptr_t target, prev_target;
+    void * jump_target, * of_target;
 } g = {
     .output_debug_info = true,
 };
@@ -98,8 +101,7 @@ static struct {
     uint8_t data_buffer2[8];
     char data_secret[MAX_SECRET_LEN];
     uint32_t data_flag;
-    uint8_t * data_mem_ptr_aux[256];
-    uint8_t * data_mem_ptr[256];
+    void * data_mem_ptr;
     func_t * data_func_ptr;
     jmp_buf data_jmp_buffer;
 } d;
@@ -114,8 +116,7 @@ init_d(void)
     strcpy((char *)d.data_buffer2, "dummy");
     strcpy((char *)d.data_secret, SECRET_STRING_START "DATA");
     d.data_flag = 0;
-    *(uintptr_t *) d.data_mem_ptr_aux = (uintptr_t) &dummy_function;
-    *(uintptr_t *) d.data_mem_ptr = (uintptr_t) &dummy_function;
+    d.data_mem_ptr = &dummy_function;
     d.data_func_ptr = &dummy_function;
 }
 
@@ -133,8 +134,7 @@ struct bss {
     uint8_t bss_buffer[256];
     char bss_secret[MAX_SECRET_LEN];
     uint32_t bss_flag;
-    uint8_t * bss_mem_ptr_aux;
-    uint8_t * bss_mem_ptr;
+    void * bss_mem_ptr;
     func_t * bss_func_ptr;
     jmp_buf bss_jmp_buffer;
 };
@@ -146,8 +146,7 @@ init_bss(struct bss *b)
     b->bss_buffer[0] = '\0';
     strcpy(b->bss_secret, SECRET_STRING_START "BSS");
     b->bss_flag = 0;
-    *(uintptr_t *) b->bss_mem_ptr_aux = (uintptr_t) &dummy_function;
-    *(uintptr_t *) b->bss_mem_ptr = (uintptr_t) &dummy_function;
+    b->bss_mem_ptr = &dummy_function;
     b->bss_func_ptr = &dummy_function;
 }
 
@@ -172,8 +171,7 @@ struct heap_targets {
     uint8_t * heap_buffer3;
 
     uint32_t * heap_flag;
-    uint8_t * heap_mem_ptr_aux;
-    uint8_t * heap_mem_ptr;
+    void * heap_mem_ptr;
     char * heap_secret;
     func_t ** heap_func_ptr_ptr;
     jmp_buf * heap_jmp_buffer;
@@ -357,8 +355,7 @@ perform_attack(
         uint8_t stack_buffer[1024];
         char stack_secret[MAX_SECRET_LEN];
         uint32_t stack_flag;
-        uint8_t * stack_mem_ptr_aux;
-        uint8_t * stack_mem_ptr;
+        void * stack_mem_ptr;
         func_t * stack_func_ptr;
         jmp_buf stack_jmp_buffer;
     } stack;
@@ -394,14 +391,12 @@ perform_attack(
     static struct bss b;
     init_bss(&b);
 
-    /* Pointer to buffer to overflow */
+    /* Address and name of buffer to overflow */
     uint8_t * buffer;
     char * buf_name;
-    /* Address to target for direct (part of) overflow */
+    /* Address and name of eventual target */
     void * target_addr;
     char * target_name;
-    /* Address for second overflow (indirect ret2libc attack) */
-    void * target_addr_aux;
 
     // write shellcode with correct jump address
     build_shellcode(shellcode_nonop);
@@ -455,7 +450,6 @@ perform_attack(
                 buf_name = "heap->heap_buffer1";
                 // Set the location of the memory pointer on the heap
                 heap->heap_mem_ptr     = heap->heap_buffer2;
-                heap->heap_mem_ptr_aux = heap->heap_buffer3;
 
                 if (g.attack.code_ptr == VAR_LEAK) {
                     heap->heap_secret = (char *)heap->heap_buffer2;
@@ -503,7 +497,7 @@ perform_attack(
 
             // set up data ptr with DOP target
             if (g.attack.inject_param == DATA_ONLY) {
-                *d.data_mem_ptr = (uint8_t *)&d.data_flag;
+                d.data_mem_ptr = &d.data_flag;
             }
             // Also set the location of the function pointer and the
             // longjmp buffer on the heap (the same since only choose one)
@@ -522,8 +516,7 @@ perform_attack(
             buffer = b.bss_buffer;
             buf_name = "b.bss_buffer";
 
-            b.bss_mem_ptr_aux = (uint8_t*)(uintptr_t)&dummy_function;
-            b.bss_mem_ptr     = (uint8_t*)(uintptr_t)&dummy_function;
+            b.bss_mem_ptr     = &dummy_function;
 
             // set up bss ptr with DOP target
             if (g.attack.inject_param == DATA_ONLY) {
@@ -538,8 +531,6 @@ perform_attack(
         *heap->heap_func_ptr_ptr = &dummy_function;
 
     // Set Target Address
-    switch (g.attack.technique) {
-        case DIRECT:
             switch (g.attack.code_ptr) {
                 case RET_ADDR:
                     target_addr = RET_ADDR_PTR;
@@ -644,29 +635,30 @@ perform_attack(
                     }
                     break;
             }
-            break;
 
+    char * of_target_name; // Name of initial overflow target
+    switch (g.attack.technique) {
+        case DIRECT:
+            g.of_target = target_addr;
+            of_target_name = target_name;
+            break;
         case INDIRECT:
             switch (g.attack.location) {
                 case STACK:
-                    target_addr     = &stack.stack_mem_ptr;
-                    target_addr_aux = &stack.stack_mem_ptr_aux;
-                    target_name        = "&stack.stack_mem_ptr (indirect)";
+                    g.of_target      = &stack.stack_mem_ptr;
+                    of_target_name = "&stack.stack_mem_ptr (indirect)";
                     break;
                 case HEAP:
-                    target_addr     = heap->heap_mem_ptr;
-                    target_addr_aux = heap->heap_mem_ptr_aux;
-                    target_name        = "heap->heap_mem_ptr (indirect)";
+                    g.of_target      = heap->heap_mem_ptr;
+                    of_target_name = "heap->heap_mem_ptr (indirect)";
                     break;
                 case DATA:
-                    target_addr     = &d.data_mem_ptr;
-                    target_addr_aux = &d.data_mem_ptr_aux;
-                    target_name        = "&d.data_mem_ptr (indirect)";
+                    g.of_target      = &d.data_mem_ptr;
+                    of_target_name = "&d.data_mem_ptr (indirect)";
                     break;
                 case BSS:
-                    target_addr     = &b.bss_mem_ptr;
-                    target_addr_aux = &b.bss_mem_ptr_aux;
-                    target_name        = "&b.bss_mem_ptr (indirect)";
+                    g.of_target      = &b.bss_mem_ptr;
+                    of_target_name = "&b.bss_mem_ptr (indirect)";
                     break;
             }
             break;
@@ -710,106 +702,55 @@ perform_attack(
             break;
     }
 
+    char * jump_target_name;
+    char * overflow_ptr_name;
+    switch (g.attack.inject_param) {
+        case RETURN_INTO_LIBC:
+            // simulate ret2libc by invoking mock libc function
+            g.jump_target = (void *)(uintptr_t)&ret2libc_target;
+            jump_target_name = "&ret2libc_target";
+            break;
+        case RETURN_ORIENTED_PROGRAMMING:
+            g.jump_target = (void *)((uintptr_t)&rop_target + PROLOGUE_LENGTH);
+            jump_target_name = "&rop_target + PROLOGUE_LENGTH";
+            break;
+        case INJECTED_CODE_NO_NOP:
+            g.jump_target = buffer; // shellcode is placed at the beginning of the overflow buffer
+            jump_target_name = "buffer (shellcode)";
+            break;
+        case DATA_ONLY:
+            // corrupt variable with nonzero value
+            g.jump_target = (void *)0xdeadc0de;
+            jump_target_name = "0xdeadc0de";
+            break;
+        default:
+            if (g.output_debug_info) {
+                fprintf(stderr, "Unknown choice of attack code");
+                return RET_ERR;
+            }
+    }
     switch (g.attack.technique) {
         case DIRECT:
-            switch (g.attack.inject_param) {
-                case RETURN_INTO_LIBC:
-                    // simulate ret2libc by invoking mock libc function
-                    g.payload.overflow_ptr = (void *)(uintptr_t)&ret2libc_target;
-                    break;
-                case RETURN_ORIENTED_PROGRAMMING:
-                    g.payload.overflow_ptr = (void *)((uintptr_t)&rop_target + PROLOGUE_LENGTH);
-                    break;
-                case INJECTED_CODE_NO_NOP:
-                    g.payload.overflow_ptr = buffer;
-                    break;
-                case DATA_ONLY:
-                    // corrupt variable with nonzero value
-                    g.payload.overflow_ptr = (void *)0xdeadc0de;
-                    break;
-                default:
-                    if (g.output_debug_info) {
-                        fprintf(stderr, "Unknown choice of attack code");
-                        return RET_ERR;
-                    }
-            }
+            g.payload.overflow_ptr = g.jump_target;
+            overflow_ptr_name = jump_target_name;
             break;
         case INDIRECT:
-            /* Here payload.overflow_ptr will point to the final pointer target   */
-            /* since an indirect attack first overflows a general pointer that in */
-            /* turn is dereferenced to overwrite the target pointer               */
-            switch (g.attack.code_ptr) {
-                case RET_ADDR:
-                    g.payload.overflow_ptr = RET_ADDR_PTR;
-                    break;
-                case FUNC_PTR_STACK_VAR:
-                    g.payload.overflow_ptr = &stack.stack_func_ptr;
-                    break;
-                case FUNC_PTR_STACK_PARAM:
-                    g.payload.overflow_ptr = stack_func_ptr_param;
-                    break;
-                case FUNC_PTR_HEAP:
-                    g.payload.overflow_ptr = (void *)(uintptr_t)heap->heap_func_ptr_ptr;
-                    break;
-                case FUNC_PTR_BSS:
-                    g.payload.overflow_ptr = &b.bss_func_ptr;
-                    break;
-                case FUNC_PTR_DATA:
-                    g.payload.overflow_ptr = &d.data_func_ptr;
-                    break;
-                case STRUCT_FUNC_PTR_STACK:
-                    g.payload.overflow_ptr = &stack.stack_struct.func_ptr;
-                    break;
-                case STRUCT_FUNC_PTR_HEAP:
-                    g.payload.overflow_ptr = &heap->heap_struct->func_ptr;
-                    break;
-                case STRUCT_FUNC_PTR_DATA:
-                    g.payload.overflow_ptr = &d.data_struct.func_ptr;
-                    break;
-                case STRUCT_FUNC_PTR_BSS:
-                    g.payload.overflow_ptr = &b.bss_struct.func_ptr;
-                    break;
-                case LONGJMP_BUF_STACK_VAR:
-                    g.payload.overflow_ptr = stack.stack_jmp_buffer;
-                    break;
-                case LONGJMP_BUF_STACK_PARAM:
-                    g.payload.overflow_ptr = stack_jmp_buffer_param;
-                    break;
-                case LONGJMP_BUF_HEAP:
-                    g.payload.overflow_ptr = *heap->heap_jmp_buffer;
-                    break;
-                case LONGJMP_BUF_DATA:
-                    g.payload.overflow_ptr = d.data_jmp_buffer;
-                    break;
-                case LONGJMP_BUF_BSS:
-                    g.payload.overflow_ptr = b.bss_jmp_buffer;
-                    break;
-                // indirect attacks don't apply to int overflows or leaks
-                case VAR_BOF:
-                case VAR_IOF:
-                case VAR_LEAK:
-                    g.payload.overflow_ptr = &d.dop_dest;
-                    break;
-                default:
-                    if (g.output_debug_info) {
-                        fprintf(stderr,
-                          "Error: Unknown choice of code pointer\n");
-                    }
-                    return RET_ERR;
-            }
+            g.payload.overflow_ptr = target_addr;
+            overflow_ptr_name = target_name;
             break;
     }
-
     if (g.output_debug_info) {
-        fprintf(stderr, "target_addr (%s) == %p\n", target_name, target_addr);
         fprintf(stderr, "buffer (%s) == %p\n", buf_name, (void *)buffer);
+        fprintf(stderr, "of_target (%s) == %p\n", of_target_name, g.of_target);
+        fprintf(stderr, "jump_target (%s) == %p\n", jump_target_name, g.jump_target);
+        fprintf(stderr, "overflow_ptr (%s) == %p\n", overflow_ptr_name, g.payload.overflow_ptr);
     }
-
-    ptrdiff_t target_offset = target_addr - (void*)buffer;
+    g.prev_target = *(uintptr_t *)g.of_target;
+    ptrdiff_t target_offset = (uintptr_t)g.of_target - (uintptr_t)buffer;
     if (target_offset < 0) {
         if (g.output_debug_info)
-            fprintf(stderr, "target_addr (0x%0*" PRIxPTR ") has to be > buffer (0x%0*" PRIxPTR "), but isn't.\n",
-              PRIxPTR_WIDTH, (uintptr_t)target_addr, PRIxPTR_WIDTH, (uintptr_t)buffer);
+            fprintf(stderr, "of_target (0x%0*" PRIxPTR ") has to be > buffer (0x%0*" PRIxPTR "), but isn't.\n",
+              PRIxPTR_WIDTH, (uintptr_t)g.of_target, PRIxPTR_WIDTH, (uintptr_t)buffer);
         return RET_ERR;
     }
 
@@ -823,10 +764,10 @@ perform_attack(
         return RET_RT_IMPOSSIBLE;
     }
 
-    /****************************************/
-    /* Overflow buffer with chosen function */
-    /* Note: Here memory will be corrupted  */
-    /****************************************/
+    /*************************************************************
+     * Overflow buffer with shellcode, padding, and overflow_ptr *
+     * Note: Here memory will be corrupted                       *
+     *************************************************************/
 
     printf("\nCorrupting data and executing test...\n");
 
@@ -869,66 +810,13 @@ perform_attack(
             return RET_ERR;
     }
     if (attack_ret != 0 && g.output_debug_info)
-        fprintf(stderr, "attack function returned %d/0x%x\n", attack_ret, attack_ret);
+        fprintf(stderr, "attack function returned %"PRIdPTR"/0x%"PRIxPTR"\n", attack_ret, attack_ret);
 
-    /*******************************************/
-    /* Ensure that code pointer is overwritten */
-    /*******************************************/
-
-    switch (g.attack.technique) {
-        case DIRECT:
-            /* Code pointer already overwritten */
-            break;
-        case INDIRECT:
-            // zero out junk byte written to general pointer
-            if (g.attack.function == SSCANF) {
-                *(uint32_t *) target_addr <<= 8;
-                *(uint32_t *) target_addr >>= 8;
-            }
-
-            if (g.attack.inject_param == RETURN_INTO_LIBC) {
-                // auxilliary overflow to give attacker control of a second general ptr
-                g.payload.overflow_ptr = (void *)(uintptr_t)&ret2libc_target;
-                // FIXME
-                ptrdiff_t indirect_offset = target_addr_aux - (void*)buffer;
-                if (indirect_offset < 0) {
-                    if (g.output_debug_info)
-                        fprintf(stderr, "target_addr_aux (0x%0*" PRIxPTR ") has to be > buffer (0x%0*" PRIxPTR "), but isn't.\n",
-                          PRIxPTR_WIDTH, (uintptr_t)target_addr_aux, PRIxPTR_WIDTH, (uintptr_t)buffer);
-                    return RET_ERR;
-                }
-
-                printf("target_addr_aux: %p\n", target_addr_aux);
-                build_payload(&g.payload, indirect_offset);
-                memcpy(buffer, g.payload.buffer, g.payload.size - 1);
-
-                switch (g.attack.location) {
-                    case STACK:
-                        *(uint32_t *) (*(uint32_t *) target_addr) =
-                          (uintptr_t) stack.stack_mem_ptr_aux;
-                        break;
-                    case HEAP:
-                        *(uint32_t *) (*(uint32_t *) target_addr) =
-                          (uintptr_t) *heap->heap_mem_ptr_aux;
-                        break;
-                    case DATA:
-                        *(uint32_t *) (*(uint32_t *) target_addr) =
-                          (uintptr_t) *d.data_mem_ptr_aux;
-                        break;
-                    case BSS:
-                        *(uint32_t *) (*(uint32_t *) target_addr) =
-                          (uintptr_t) b.bss_mem_ptr_aux;
-                        break;
-                }
-            } else if (g.attack.inject_param == INJECTED_CODE_NO_NOP) {
-                *(uintptr_t *) (*(uintptr_t *) target_addr) =
-                  (uintptr_t) buffer;
-            }
-            break;
-        default:
-            if (g.output_debug_info)
-                fprintf(stderr, "Error: Unknown choice of attack technique.\n");
-            return RET_ERR;
+    /***********************************************
+     * Overwrite code pointer for indirect attacks *
+     ***********************************************/
+    if (g.attack.technique == INDIRECT) {
+        *(uintptr_t *) *(uintptr_t *) g.of_target = (uintptr_t)g.jump_target;
     }
 
     switch (g.attack.code_ptr) {
@@ -980,16 +868,16 @@ perform_attack(
         case VAR_IOF:
             switch (g.attack.location) {
                 case STACK:
-                    dop_target(buffer, *stack.stack_mem_ptr);
+                    dop_target(buffer, * (uint32_t *) stack.stack_mem_ptr);
                     break;
                 case HEAP:
-                    dop_target(buffer, *heap->heap_mem_ptr);
+                    dop_target(buffer, * (uint32_t *) heap->heap_mem_ptr);
                     break;
                 case DATA:
-                    dop_target(buffer, **d.data_mem_ptr);
+                    dop_target(buffer, * (uint32_t *) d.data_mem_ptr);
                     break;
                 case BSS:
-                    dop_target(buffer, *b.bss_mem_ptr);
+                    dop_target(buffer, * (uint32_t *) b.bss_mem_ptr);
                     break;
             }
             break;
