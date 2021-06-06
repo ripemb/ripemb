@@ -88,6 +88,14 @@ extern size_t nr_of_locations;
 extern const char * const opt_funcs[];
 extern size_t nr_of_funcs;
 
+#ifndef RIPE_HEAP_SAFE_SIZE
+    #define RIPE_HEAP_SAFE_SIZE (32*1024)
+#endif
+/* Take a snapshot of to current heap area and save it into heap_safe. */
+void save_heap(uint8_t *heap_safe);
+/* Restore the heap area from the snapshot saved in heap_safe. */
+void restore_heap(uint8_t *heap_safe);
+
 enum RIPE_RET {
     RET_ATTACK_SUCCESS = 42,
     RET_ATTACK_FAIL,

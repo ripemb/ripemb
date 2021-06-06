@@ -69,6 +69,7 @@ static struct {
     bool output_debug_info;
     struct attack_form attack;
     struct payload payload;
+    uint8_t heap_safe[RIPE_HEAP_SAFE_SIZE];
 } g = {
     .output_debug_info = true,
 };
@@ -227,6 +228,8 @@ set_attack_indices(size_t t, size_t i, size_t c, size_t l, size_t f)
 int
 main(int argc, char ** argv)
 {
+    save_heap(g.heap_safe);
+
     // Set defaults
     g.attack.technique = RIPE_DEF_TECHNIQUE;
     g.attack.inject_param = RIPE_DEF_INJECT;
@@ -254,6 +257,7 @@ main(int argc, char ** argv)
 #else
 #endif
                         attack_once();
+                        restore_heap(g.heap_safe);
 #ifndef RIPE_DEF_ONLY
                     }
                 }
