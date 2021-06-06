@@ -70,6 +70,7 @@ static struct {
     unsigned int impossible;
     unsigned int rtimpossible;
     unsigned int successful;
+    unsigned int failed;
     unsigned int detected;
     unsigned int illegal_instr;
     struct attack_form attack;
@@ -269,8 +270,8 @@ main(int argc, char ** argv)
             }
         }
     }
-    printf("%d/%d statically possible, %d are dynamically impossible, %d actually worked, %d were detected, and %d led to illegal instructions.\n",
-           g.possible, g.possible+g.impossible, g.rtimpossible, g.successful, g.detected, g.illegal_instr);
+    printf("%d/%d statically possible, %d are dynamically impossible, %d actually worked, %d were detected, %d failed, and %d led to illegal instructions.\n",
+           g.possible, g.possible+g.impossible, g.rtimpossible, g.successful, g.detected, g.failed, g.illegal_instr);
 #endif
 
     return 0;
@@ -295,7 +296,7 @@ attack_once(void) {
         enum RIPE_RET ret = attack_wrapper();
         fprintf(stderr, "attack_wrapper() returned %d (", ret);
         switch (ret) {
-            case RET_ATTACK_FAIL: fprintf(stderr, "attack failed)\n"); break;
+            case RET_ATTACK_FAIL: g.failed++; fprintf(stderr, "attack failed)\n"); break;
             case RET_RT_IMPOSSIBLE: g.rtimpossible++; fprintf(stderr, "run-time check says no)\n"); break;
             case RET_ERR: fprintf(stderr, "setup error)\n"); break;
             default: fprintf(stderr, "WTF?)\n"); break;
@@ -312,6 +313,7 @@ attack_once(void) {
                 fprintf(stderr, "attack detected)\n");
                 break;
             case RET_ATTACK_FAIL:
+                g.failed++;
                 fprintf(stderr, "attack failed)\n");
                 break;
             case RET_ATTACK_FAIL_ILLEGAL_INSTR:
