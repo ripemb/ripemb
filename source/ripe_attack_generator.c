@@ -8,8 +8,7 @@
  * code pointer = return address, function pointer, vulnerable struct, longjmp buffer,
  *         non-control data variable
  * location = stack, heap, data, bss
- * function = memcpy, strcpy, strncpy, strcat, strncat, sprintf, snprintf,
- *         sscanf, homebrew memcpy
+ * function = memcpy, homebrew, sscanf, strcpy, strncpy, strcat, strncat, sprintf, snprintf
  */
 
 #include <stdbool.h>
@@ -835,6 +834,15 @@ perform_attack(
             // memcpy() shouldn't copy the terminating NULL, therefore - 1
             attack_ret = (uintptr_t)memcpy(buffer, g.payload.buffer, g.payload.size - 1);
             break;
+        case HOMEBREW:
+            homebrew_memcpy(buffer, g.payload.buffer, g.payload.size - 1);
+            break;
+        case SSCANF: {
+            char fmt[sizeof(g.payload.size)*4+3];
+            snprintf(fmt, sizeof(fmt)-1, "%%%zuc", g.payload.size);
+            attack_ret = sscanf(g.payload.buffer, fmt, buffer);
+            break;
+        }
         case STRCPY:
             attack_ret = (uintptr_t)strcpy((char *)buffer, g.payload.buffer);
             break;
@@ -852,15 +860,6 @@ perform_attack(
             break;
         case STRNCAT:
             attack_ret = (uintptr_t)strncat((char *)buffer, g.payload.buffer, g.payload.size);
-            break;
-        case SSCANF: {
-            char fmt[16];
-            snprintf(fmt, sizeof(fmt)-1, "%%%ic", g.payload.size);
-            attack_ret = sscanf(g.payload.buffer, fmt, buffer);
-            break;
-        }
-        case HOMEBREW:
-            homebrew_memcpy(buffer, g.payload.buffer, g.payload.size - 1);
             break;
         default:
             if (g.output_debug_info)

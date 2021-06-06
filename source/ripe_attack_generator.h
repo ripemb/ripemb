@@ -44,8 +44,8 @@ enum code_ptrs     {RET_ADDR=300, FUNC_PTR_STACK_VAR, FUNC_PTR_STACK_PARAM,
                     STRUCT_FUNC_PTR_STACK,STRUCT_FUNC_PTR_HEAP,
                     STRUCT_FUNC_PTR_DATA,STRUCT_FUNC_PTR_BSS, VAR_BOF, VAR_IOF, VAR_LEAK};
 enum locations     {STACK=400, HEAP, BSS, DATA};
-enum functions     {MEMCPY=500, STRCPY, STRNCPY, SPRINTF, SNPRINTF,
-                    STRCAT, STRNCAT, SSCANF, HOMEBREW};
+enum functions     {MEMCPY=500, HOMEBREW, SSCANF, STRCPY, STRNCPY, SPRINTF, SNPRINTF,
+                    STRCAT, STRNCAT};
 
 struct attack_form {
         enum techniques technique;

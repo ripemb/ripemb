@@ -36,8 +36,8 @@ size_t nr_of_locations = ARR_ELEMS(opt_locations);
 
 /* 9 vulnerable functions */
 __attribute__ ((section (".rodata")))
-const char * const opt_funcs[] = {"memcpy", "strcpy", "strncpy", "sprintf", "snprintf",
-                                  "strcat", "strncat", "sscanf", "homebrew"};
+const char * const opt_funcs[] = {"memcpy", "homebrew", "sscanf", "strcpy", "strncpy", "sprintf", "snprintf",
+                                  "strcat", "strncat"};
 size_t nr_of_funcs = ARR_ELEMS(opt_funcs);
 
 #ifndef RIPE_NO_CLI
@@ -184,21 +184,21 @@ set_function(char * choice, enum functions *f)
     if (strcmp(choice, opt_funcs[0]) == 0) {
         *f = MEMCPY;
     } else if (strcmp(choice, opt_funcs[1]) == 0) {
-        *f = STRCPY;
-    } else if (strcmp(choice, opt_funcs[2]) == 0) {
-        *f = STRNCPY;
-    } else if (strcmp(choice, opt_funcs[3]) == 0) {
-        *f = SPRINTF;
-    } else if (strcmp(choice, opt_funcs[4]) == 0) {
-        *f = SNPRINTF;
-    } else if (strcmp(choice, opt_funcs[5]) == 0) {
-        *f = STRCAT;
-    } else if (strcmp(choice, opt_funcs[6]) == 0) {
-        *f = STRNCAT;
-    } else if (strcmp(choice, opt_funcs[7]) == 0) {
-        *f = SSCANF;
-    } else if (strcmp(choice, opt_funcs[8]) == 0) {
         *f = HOMEBREW;
+    } else if (strcmp(choice, opt_funcs[2]) == 0) {
+        *f = SSCANF;
+    } else if (strcmp(choice, opt_funcs[3]) == 0) {
+        *f = STRCPY;
+    } else if (strcmp(choice, opt_funcs[4]) == 0) {
+        *f = STRNCPY;
+    } else if (strcmp(choice, opt_funcs[5]) == 0) {
+        *f = SPRINTF;
+    } else if (strcmp(choice, opt_funcs[6]) == 0) {
+        *f = SNPRINTF;
+    } else if (strcmp(choice, opt_funcs[7]) == 0) {
+        *f = STRCAT;
+    } else if (strcmp(choice, opt_funcs[8]) == 0) {
+        *f = STRNCAT;
     } else {
         fprintf(stderr,
           "Error: Unknown choice of vulnerable function \"%s\"\n",
