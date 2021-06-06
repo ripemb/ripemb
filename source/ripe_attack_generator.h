@@ -54,13 +54,10 @@ struct attack_form {
 };
 
 struct payload {
-        enum inject_params inject_param;
         size_t size;
         void *overflow_ptr; /* Points to code pointer (direct attack) */
                             /* or general pointer (indirect attack)   */
         char *buffer;
-
-        jmp_buf *jmp_buffer;
 };
 
 typedef void (func_t)(void);
