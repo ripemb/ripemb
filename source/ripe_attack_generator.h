@@ -131,7 +131,7 @@ enum RIPE_RET {
 /* This means that we should pad with                               */
 /* size - size_sc - size_addr - size_null = 31-12-4-1 = 14 bytes    */
 /* and start the padding at index size_sc                           */
-bool build_payload(struct payload *payload);
+bool build_payload(struct payload *payload, ptrdiff_t offset);
 
 bool set_technique(char *choice, enum techniques *t);
 bool set_inject_param(char *choice, enum inject_params *i);

@@ -757,20 +757,11 @@ perform_attack(
         fprintf(stderr, "buffer (%s) == %p\n", buf_name, (void *)buffer);
     }
 
-    // ------------------------------------------------------
-    /* Calculate payload size for overflow of chosen target address */
-    if ((uintptr_t) target_addr > (uintptr_t) buffer) {
-        g.payload.size =
-          (unsigned int) ((unsigned long) target_addr + sizeof(long)
-          - (unsigned long) buffer
-          + 1); /* For null termination so that buffer can be     */
-                /* used with string functions in standard library */
-
+    ptrdiff_t target_offset = target_addr - (void*)buffer;
+    if (target_offset < 0) {
         if (g.output_debug_info)
-            fprintf(stderr, "payload size == %zd\n", g.payload.size);
-    } else {
-        if (g.output_debug_info)
-            fprintf(stderr, "Error calculating size of payload\n");
+            fprintf(stderr, "target_addr (0x%0*" PRIxPTR ") has to be > buffer (0x%0*" PRIxPTR "), but isn't.\n",
+              PRIxPTR_WIDTH, (uintptr_t)target_addr, PRIxPTR_WIDTH, (uintptr_t)buffer);
         return RET_ERR;
     }
 
@@ -778,7 +769,7 @@ perform_attack(
     /* start filling the buffer from that first byte                        */
     buffer[0] = '\0';
 
-    if (!build_payload(&g.payload)) {
+    if (!build_payload(&g.payload, target_offset)) {
         if (g.output_debug_info)
             fprintf(stderr, "Error: Could not build payload\n");
         return RET_RT_IMPOSSIBLE;
@@ -850,11 +841,18 @@ perform_attack(
             if (g.attack.inject_param == RETURN_INTO_LIBC) {
                 // auxilliary overflow to give attacker control of a second general ptr
                 g.payload.overflow_ptr = (void *)(uintptr_t)&ret2libc_target;
-                g.payload.size         = (uintptr_t) target_addr_aux
-                  - (uintptr_t) buffer + sizeof(long) + 1;
-                build_payload(&g.payload);
-                memcpy(buffer, g.payload.buffer, g.payload.size - 1);
+                // FIXME
+                ptrdiff_t indirect_offset = target_addr_aux - (void*)buffer;
+                if (indirect_offset < 0) {
+                    if (g.output_debug_info)
+                        fprintf(stderr, "target_addr_aux (0x%0*" PRIxPTR ") has to be > buffer (0x%0*" PRIxPTR "), but isn't.\n",
+                          PRIxPTR_WIDTH, (uintptr_t)target_addr_aux, PRIxPTR_WIDTH, (uintptr_t)buffer);
+                    return RET_ERR;
+                }
+
                 printf("target_addr_aux: %p\n", target_addr_aux);
+                build_payload(&g.payload, indirect_offset);
+                memcpy(buffer, g.payload.buffer, g.payload.size - 1);
 
                 switch (g.attack.location) {
                     case STACK:
@@ -958,11 +956,15 @@ perform_attack(
 /* BUILD_PAYLOAD() */
 /*******************/
 bool
-build_payload(struct payload * payload)
+build_payload(struct payload * payload, ptrdiff_t offset)
 {
-    size_t size_shellcode, bytes_to_pad;
-    char * shellcode, * temp_char_buffer, * temp_char_ptr;
-    
+    size_t size_shellcode = 0, bytes_to_pad;
+    uint8_t * shellcode = NULL;
+
+    /* + 1 for null termination so that buffer can be */
+    /* used with string functions in standard library */
+    payload->size = (offset + sizeof(uintptr_t) + 1);
+
     switch (g.attack.inject_param) {
         case INJECTED_CODE_NO_NOP:
             if (payload->size < (size_shellcode_nonop + sizeof(func_t*))) {
@@ -977,23 +979,24 @@ build_payload(struct payload * payload)
                 payload->size = 256 + sizeof(long) + sizeof(char);
             
             if (g.attack.code_ptr == VAR_LEAK) {
-                // simulated packet with length included
-                payload->size += 32 - sizeof(long);
-                payload->buffer[0] = payload->size & 0xFF;
-                payload->buffer[1] = payload->size / 0x100;
-                payload->buffer[2] = 'A';
-                payload->buffer[3] = '\0';
-                payload->size = 4;
+                /* The buffer stores the offset ORed with a mask and the mask itself,
+                 * simulating a data packet with an encoded length field.
+                 * The mask ensures compatibility with string functions. */
+                payload->size = 2*sizeof(size_t) + sizeof(char);
+                payload->buffer = malloc(payload->size);
+                size_t mask = (offset & 0x01010101);
+                *(((size_t*)payload->buffer)+1) = mask | 0x10101010;
+                *(size_t*)payload->buffer = offset | 0x01010101;
+                payload->buffer[payload->size-1] = '\0';
                 return true;
             } /* else fall through */
         case RETURN_ORIENTED_PROGRAMMING:
         case RETURN_INTO_LIBC:
             if (payload->size < sizeof(long))
                 return false;
-
-            size_shellcode = 0;
-            shellcode      = "dummy";
             break;
+        default:
+            return false;
     }
     /* Allocate payload buffer */
     payload->buffer = malloc(payload->size);
@@ -1024,10 +1027,9 @@ build_payload(struct payload * payload)
     /* Finally, add the terminating null character at the end */
     memset((payload->buffer + payload->size - 1), '\0', 1);
     
-        fprintf(stderr, "payload: %s\n", payload->buffer);
     if (g.output_debug_info)
+        fprintf(stderr, "payload of %d bytes created.\n", payload->size);
     return true;
-
 } /* build_payload */
 
 static void
@@ -1110,16 +1112,36 @@ iof(uint8_t * buf, uint32_t iv)
 
 void
 data_leak(uint8_t *buf) {
-    uint16_t size = buf[0] + (buf[1] * 0x100), i;
+    size_t size = *(size_t*)buf;
+    size_t mask = *((size_t*)buf+1);
+    size = (size & ~0x01010101) | (0x01010101 & mask);
     uint8_t *msg = malloc(size);
+    if (msg == NULL) {
+        fprintf(stderr, "malloc()ing data_leak buffer failed!\n");
+        exit(1);
+    }
+    fprintf(stderr, "%s: allocated %zd B\n", __func__, size);
 
-    memcpy(msg, buf + 2, size);
-    for (i = 0; i < size; i++) {
-        if (msg[i] >= 0x20) putc(msg[i],stdout);
+    size_t common_len = strlen(SECRET_STRING_START);
+    const char *loc_string;
+    switch (g.attack.location) {
+        case BSS: loc_string = "BSS"; break;
+        case DATA: loc_string = "DATA"; break;
+        case HEAP: loc_string = "HEAP"; break;
+        case STACK: loc_string = "STACK"; break;
+        default:
+            fprintf(stderr, "%s: location %d not implemented.\n",
+            __func__, g.attack.location);
+            return;
     }
 
-    putc('\n', stdout);
-}           
+    memcpy(msg, buf + size, size);
+    if ((strncmp((char *)msg, SECRET_STRING_START, common_len) == 0) &&
+        (strcmp((char *)(msg+common_len), loc_string) == 0)) {
+        fprintf(stderr, "%s: found correct secret: \"%s\"\n", __func__, msg);
+    }
+    fprintf(stderr, "msg does not match secret string\n");
+}
 
 /*********************/
 /* BUILD_SHELLCODE() */
