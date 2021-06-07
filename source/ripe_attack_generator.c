@@ -1032,6 +1032,11 @@ build_payload(struct payload * payload, ptrdiff_t offset)
                  * The mask ensures compatibility with string functions. */
                 payload->size = 2*sizeof(size_t) + sizeof(char);
                 payload->buffer = malloc(payload->size);
+                if (payload->buffer == NULL) {
+                    fprintf(stderr, "malloc()ing payload->buffer failed!\n");
+                    exit(1);
+                }
+
                 size_t mask = (offset & 0x01010101);
                 *(((size_t*)payload->buffer)+1) = mask | 0x10101010;
                 *(size_t*)payload->buffer = offset | 0x01010101;
@@ -1048,6 +1053,10 @@ build_payload(struct payload * payload, ptrdiff_t offset)
     }
     /* Allocate payload buffer */
     payload->buffer = malloc(payload->size);
+    if (payload->buffer == NULL) {
+        fprintf(stderr, "malloc()ing payload->buffer failed!\n");
+        exit(1);
+    }
 
     /* Copy shellcode into payload buffer */
     memcpy(payload->buffer, shellcode, size_shellcode);
@@ -1170,6 +1179,10 @@ iof(uint8_t * buf, uint32_t iv)
 
     // 0-length allocation and vulenrable hash operations
     map      = malloc(len * sizeof(uint8_t));
+    if (map == NULL) {
+        fprintf(stderr, "malloc()ing map failed!\n");
+        exit(1);
+    }
     fprintf(stderr, "%s: allocated %zu B\n", __func__, len * sizeof(uint8_t));
     key     -= (uintptr_t) map;
     key     &= (uint16_t) len - 1;
