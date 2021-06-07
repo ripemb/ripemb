@@ -88,6 +88,12 @@ extern size_t nr_of_locations;
 extern const char * const opt_funcs[];
 extern size_t nr_of_funcs;
 
+enum RIPE_RET {
+    RET_ATTACK_SUCCESS = 42,
+    RET_ATTACK_FAIL,
+    RET_RT_IMPOSSIBLE,
+    RET_ERR,
+};
 
 
 /* BUILD_PAYLOAD()                                                  */

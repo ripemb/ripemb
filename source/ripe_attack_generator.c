@@ -54,9 +54,9 @@ static uint8_t shellcode_nonop[12];
 #define MAX_SECRET_LEN (32)
 
 static void attack_once(void);
-static int attack_wrapper(void);
-static int perform_attack(func_t **stack_func_ptr_param,
-                          jmp_buf *stack_jmp_buffer_param);
+static enum RIPE_RET attack_wrapper(void);
+static enum RIPE_RET perform_attack(func_t **stack_func_ptr_param,
+                                    jmp_buf *stack_jmp_buffer_param);
 static void dummy_function(void);
 static const char *hex_to_bin(char c);
 static void hex_to_string(char * str, size_t val);
@@ -244,7 +244,7 @@ attack_once(void) {
 }
 
 __attribute__ ((noinline)) // Make sure this function has its own stack frame
-static int
+static enum RIPE_RET
 attack_wrapper(void) {
     jmp_buf stack_jmp_buffer_param;
     func_t *stack_func_ptr_param = dummy_function;
@@ -254,7 +254,7 @@ attack_wrapper(void) {
 /********************/
 /* PERFORM_ATTACK() */
 /********************/
-static int
+static enum RIPE_RET
 perform_attack(
     func_t ** stack_func_ptr_param,
     jmp_buf *stack_jmp_buffer_param)
@@ -375,8 +375,7 @@ perform_attack(
                     fprintf(stderr,
                       "Error: Heap buffers allocated in the wrong order.\n");
                 }
-
-                exit(1);
+                return RET_ERR;
             }
 
             // set up heap ptr with DOP target
@@ -551,31 +550,31 @@ perform_attack(
                 /* setjmp() returns 0 if returning directly and non-zero when returning */
                 /* from longjmp() using the saved context. Attack failed.               */
                 printf("Longjmp attack failed. Returning normally...\n");
-                return 1;
+                return RET_ATTACK_FAIL;
             }
             break;
         case LONGJMP_BUF_STACK_PARAM:
             if (setjmp(*stack_jmp_buffer_param) != 0) {
                 printf("Longjmp attack failed. Returning normally...\n");
-                return 1;
+                return RET_ATTACK_FAIL;
             }
             break;
         case LONGJMP_BUF_HEAP:
             if (setjmp(*heap->heap_jmp_buffer) != 0) {
                 printf("Longjmp attack failed. Returning normally...\n");
-                return 1;
+                return RET_ATTACK_FAIL;
             }
             break;
         case LONGJMP_BUF_DATA:
             if (setjmp(d.data_jmp_buffer) != 0) {
                 printf("Longjmp attack failed. Returning normally...\n");
-                return 1;
+                return RET_ATTACK_FAIL;
             }
             break;
         case LONGJMP_BUF_BSS:
             if (setjmp(b.bss_jmp_buffer) != 0) {
                 printf("Longjmp attack failed. Returning normally...\n");
-                return 1;
+                return RET_ATTACK_FAIL;
             }
             break;
         default:
@@ -602,7 +601,7 @@ perform_attack(
                 default:
                     if (g.output_debug_info) {
                         fprintf(stderr, "Unknown choice of attack code");
-                        exit(1);
+                        return RET_ERR;
                     }
             }
             break;
@@ -667,9 +666,7 @@ perform_attack(
                         fprintf(stderr,
                           "Error: Unknown choice of code pointer\n");
                     }
-
-                    exit(1);
-                    break;
+                    return RET_ERR;
             }
             break;
     }
@@ -693,7 +690,7 @@ perform_attack(
     } else {
         if (g.output_debug_info)
             fprintf(stderr, "Error calculating size of payload\n");
-        exit(1);
+        return RET_ERR;
     }
 
     /* Set first byte of buffer to null to allow concatenation functions to */
@@ -703,7 +700,7 @@ perform_attack(
     if (!build_payload(&g.payload)) {
         if (g.output_debug_info)
             fprintf(stderr, "Error: Could not build payload\n");
-        exit(1);
+        return RET_RT_IMPOSSIBLE;
     }
 
     /****************************************/
@@ -746,8 +743,7 @@ perform_attack(
         default:
             if (g.output_debug_info)
                 fprintf(stderr, "Error: Unknown choice of function\n");
-            exit(1);
-            break;
+            return RET_ERR;
     }
 
     /*******************************************/
@@ -799,10 +795,8 @@ perform_attack(
             break;
         default:
             if (g.output_debug_info)
-                fprintf(stderr, "Error: Unknown choice of attack parameterB\n");
-
-            exit(1);
-            break;
+                fprintf(stderr, "Error: Unknown choice of attack technique.\n");
+            return RET_ERR;
     }
 
     printf("");
@@ -874,7 +868,7 @@ perform_attack(
             data_leak(buffer);
             break;
     }
-    return 1;
+    return RET_ATTACK_FAIL;
 } /* perform_attack */
 
 /*******************/
