@@ -348,8 +348,10 @@ perform_attack(
 
     /* Pointer to buffer to overflow */
     uint8_t * buffer;
+    char * buf_name;
     /* Address to target for direct (part of) overflow */
     void * target_addr;
+    char * target_name;
     /* Address for second overflow (indirect ret2libc attack) */
     void * target_addr_aux;
 
@@ -363,8 +365,10 @@ perform_attack(
               g.attack.technique == DIRECT)
             {
                 buffer = stack.stack_struct.buffer;
+                buf_name = "stack.stack_struct.buffer";
             } else {
                 buffer = stack.stack_buffer;
+                buf_name = "stack.stack_buffer";
             }
 
             // set up stack ptr with DOP target
@@ -385,6 +389,7 @@ perform_attack(
               g.attack.technique == DIRECT)
             {
                 buffer = heap->heap_struct->buffer;
+                buf_name = "heap->heap_struct->buffer";
                 break;
             }
 
@@ -392,6 +397,7 @@ perform_attack(
               ((uintptr_t) heap->heap_buffer2 < (uintptr_t) heap->heap_buffer3))
             {
                 buffer = heap->heap_buffer1;
+                buf_name = "heap->heap_buffer1";
                 // Set the location of the memory pointer on the heap
                 heap->heap_mem_ptr     = heap->heap_buffer2;
                 heap->heap_mem_ptr_aux = heap->heap_buffer3;
@@ -425,6 +431,7 @@ perform_attack(
             // Special case for stack_struct
             if (g.attack.code_ptr == STRUCT_FUNC_PTR_DATA) {
                 buffer = d.data_struct.buffer;
+                buf_name = "d.data_struct.buffer";
                 break;
             }
 
@@ -433,8 +440,10 @@ perform_attack(
               g.attack.technique == DIRECT)
             {
                 buffer = d.data_buffer2;
+                buf_name = "d.data_buffer2";
             } else {
                 buffer = d.data_buffer1;
+                buf_name = "d.data_buffer1";
             }
 
             // set up data ptr with DOP target
@@ -451,10 +460,12 @@ perform_attack(
             // Special case for bss_struct
             if (g.attack.code_ptr == STRUCT_FUNC_PTR_BSS) {
                 buffer = b.bss_struct.buffer;
+                buf_name = "b.bss_struct.buffer";
                 break;
             }
 
             buffer = b.bss_buffer;
+            buf_name = "b.bss_buffer";
 
             b.bss_mem_ptr_aux = (uint8_t*)(uintptr_t)&dummy_function;
             b.bss_mem_ptr     = (uint8_t*)(uintptr_t)&dummy_function;
@@ -477,48 +488,63 @@ perform_attack(
             switch (g.attack.code_ptr) {
                 case RET_ADDR:
                     target_addr = RET_ADDR_PTR;
+                    target_name = "RET_ADDR_PTR";
                     break;
                 case FUNC_PTR_STACK_VAR:
                     target_addr = &stack.stack_func_ptr;
+                    target_name = "&stack.stack_func_ptr";
                     break;
                 case FUNC_PTR_STACK_PARAM:
                     target_addr = stack_func_ptr_param;
+                    target_name = "stack_func_ptr_param";
                     break;
                 case FUNC_PTR_HEAP:
                     target_addr = heap->heap_func_ptr_ptr;
+                    target_name = "heap->heap_func_ptr_ptr";
                     break;
                 case FUNC_PTR_BSS:
                     target_addr = &b.bss_func_ptr;
+                    target_name = "&b.bss_func_ptr";
                     break;
                 case FUNC_PTR_DATA:
                     target_addr = &d.data_func_ptr;
+                    target_name = "&d.data_func_ptr";
                     break;
                 case LONGJMP_BUF_STACK_VAR:
                     target_addr = stack.stack_jmp_buffer;
+                    target_name = "stack.stack_jmp_buffer";
                     break;
                 case LONGJMP_BUF_STACK_PARAM:
                     target_addr = stack_jmp_buffer_param;
+                    target_name = "stack_jmp_buffer_param";
                     break;
                 case LONGJMP_BUF_HEAP:
                     target_addr = heap->heap_jmp_buffer;
+                    target_name = "heap->heap_jmp_buffer";
                     break;
                 case LONGJMP_BUF_DATA:
                     target_addr = d.data_jmp_buffer;
+                    target_name = "d.data_jmp_buffer";
                     break;
                 case LONGJMP_BUF_BSS:
                     target_addr = b.bss_jmp_buffer;
+                    target_name = "b.bss_jmp_buffer";
                     break;
                 case STRUCT_FUNC_PTR_STACK:
                     target_addr = &stack.stack_struct.func_ptr;
+                    target_name = "&stack.stack_struct.func_ptr";
                     break;
                 case STRUCT_FUNC_PTR_HEAP:
                     target_addr = &heap->heap_struct->func_ptr;
+                    target_name = "heap->heap_struct.func_ptr";
                     break;
                 case STRUCT_FUNC_PTR_DATA:
                     target_addr = &d.data_struct.func_ptr;
+                    target_name = "&d.data_struct.func_ptr";
                     break;
                 case STRUCT_FUNC_PTR_BSS:
                     target_addr = &b.bss_struct.func_ptr;
+                    target_name = "&b.bss_struct.func_ptr";
                     break;
                 case VAR_BOF:
                 // if data-only, location determines target
@@ -526,15 +552,19 @@ perform_attack(
                     switch (g.attack.location) {
                         case STACK:
                             target_addr = &stack.stack_flag;
+                            target_name = "&stack.stack_flag";
                             break;
                         case HEAP:
                             target_addr = heap->heap_flag;
+                            target_name = "heap->heap_flag";
                             break;
                         case DATA:
                             target_addr = &d.data_flag;
+                            target_name = "&d.data_flag";
                             break;
                         case BSS:
                             target_addr = &b.bss_flag;
+                            target_name = "&b.bss_flag";
                             break;
                     }
                     break;
@@ -542,15 +572,19 @@ perform_attack(
                     switch (g.attack.location) {
                         case STACK:
                             target_addr = &stack.stack_secret;
+                            target_name = "&stack.stack_secret";
                             break;
                         case HEAP:
                             target_addr = heap->heap_secret;
+                            target_name = "heap->heap_secret";
                             break;
                         case DATA:
                             target_addr = &d.data_secret;
+                            target_name = "&d.data_secret";
                             break;
                         case BSS:
                             target_addr = &b.bss_secret;
+                            target_name = "&b.bss_secret";
                             break;
                     }
                     break;
@@ -562,18 +596,22 @@ perform_attack(
                 case STACK:
                     target_addr     = &stack.stack_mem_ptr;
                     target_addr_aux = &stack.stack_mem_ptr_aux;
+                    target_name        = "&stack.stack_mem_ptr (indirect)";
                     break;
                 case HEAP:
                     target_addr     = heap->heap_mem_ptr;
                     target_addr_aux = heap->heap_mem_ptr_aux;
+                    target_name        = "heap->heap_mem_ptr (indirect)";
                     break;
                 case DATA:
                     target_addr     = &d.data_mem_ptr;
                     target_addr_aux = &d.data_mem_ptr_aux;
+                    target_name        = "&d.data_mem_ptr (indirect)";
                     break;
                 case BSS:
                     target_addr     = &b.bss_mem_ptr;
                     target_addr_aux = &b.bss_mem_ptr_aux;
+                    target_name        = "&b.bss_mem_ptr (indirect)";
                     break;
             }
             break;
@@ -708,8 +746,8 @@ perform_attack(
     }
 
     if (g.output_debug_info) {
-        fprintf(stderr, "target_addr == %p\n", target_addr);
-        fprintf(stderr, "buffer == %p\n", buffer);
+        fprintf(stderr, "target_addr (%s) == %p\n", target_name, target_addr);
+        fprintf(stderr, "buffer (%s) == %p\n", buf_name, buffer);
     }
 
     // ------------------------------------------------------
