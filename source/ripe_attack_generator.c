@@ -747,7 +747,7 @@ perform_attack(
 
     if (g.output_debug_info) {
         fprintf(stderr, "target_addr (%s) == %p\n", target_name, target_addr);
-        fprintf(stderr, "buffer (%s) == %p\n", buf_name, buffer);
+        fprintf(stderr, "buffer (%s) == %p\n", buf_name, (void *)buffer);
     }
 
     // ------------------------------------------------------
@@ -782,33 +782,36 @@ perform_attack(
     /* Note: Here memory will be corrupted  */
     /****************************************/
 
+    printf("\nCorrupting data and executing test...\n");
+
+    uintptr_t attack_ret = 0;
     switch (g.attack.function) {
         case MEMCPY:
             // memcpy() shouldn't copy the terminating NULL, therefore - 1
-            memcpy(buffer, g.payload.buffer, g.payload.size - 1);
+            attack_ret = (uintptr_t)memcpy(buffer, g.payload.buffer, g.payload.size - 1);
             break;
         case STRCPY:
-            strcpy((char *)buffer, g.payload.buffer);
+            attack_ret = (uintptr_t)strcpy((char *)buffer, g.payload.buffer);
             break;
         case STRNCPY:
-            strncpy((char *)buffer, g.payload.buffer, g.payload.size);
+            attack_ret = (uintptr_t)strncpy((char *)buffer, g.payload.buffer, g.payload.size);
             break;
         case SPRINTF:
-             sprintf((char *)buffer, "%s", g.payload.buffer);
+             attack_ret = sprintf((char *)buffer, "%s", g.payload.buffer);
             break;
         case SNPRINTF:
-            snprintf((char *)buffer, g.payload.size, "%s", g.payload.buffer);
+            attack_ret = snprintf((char *)buffer, g.payload.size, "%s", g.payload.buffer);
             break;
         case STRCAT:
-            strcat((char *)buffer, g.payload.buffer);
+            attack_ret = (uintptr_t)strcat((char *)buffer, g.payload.buffer);
             break;
         case STRNCAT:
-            strncat((char *)buffer, g.payload.buffer, g.payload.size);
+            attack_ret = (uintptr_t)strncat((char *)buffer, g.payload.buffer, g.payload.size);
             break;
         case SSCANF: {
             char fmt[16];
             snprintf(fmt, sizeof(fmt)-1, "%%%ic", g.payload.size);
-            sscanf(g.payload.buffer, fmt, buffer);
+            attack_ret = sscanf(g.payload.buffer, fmt, buffer);
             break;
         }
         case HOMEBREW:
@@ -819,6 +822,8 @@ perform_attack(
                 fprintf(stderr, "Error: Unknown choice of function\n");
             return RET_ERR;
     }
+    if (attack_ret != 0 && g.output_debug_info)
+        fprintf(stderr, "attack function returned %d/0x%x\n", attack_ret, attack_ret);
 
     /*******************************************/
     /* Ensure that code pointer is overwritten */
@@ -872,9 +877,6 @@ perform_attack(
                 fprintf(stderr, "Error: Unknown choice of attack technique.\n");
             return RET_ERR;
     }
-
-    printf("");
-    printf("\nExecuting attack... ");
 
     switch (g.attack.code_ptr) {
         case RET_ADDR:
