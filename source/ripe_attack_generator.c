@@ -67,6 +67,10 @@ static void format_instruction(uint8_t *dest, size_t insn);
  * This is only possible in C by stuffing everything in structs... */
 static struct {
     bool output_debug_info;
+    unsigned int possible;
+    unsigned int impossible;
+    unsigned int rtimpossible;
+    unsigned int successful;
     struct attack_form attack;
     struct payload payload;
     uint8_t heap_safe[RIPE_HEAP_SAFE_SIZE];
@@ -264,19 +268,52 @@ main(int argc, char ** argv)
             }
         }
     }
+    printf("%d/%d statically possible, %d are dynamically impossible, %d actually worked.\n",
+           g.possible, g.possible+g.impossible, g.rtimpossible, g.successful);
 #endif
 
     return 0;
 } /* main */
 
 
+__attribute__ ((weak)) void
+longjmp_no_enforce (jmp_buf jb, int rv) {
+    longjmp(jb, rv);
+}
 
 static void
 attack_once(void) {
-    if (is_attack_possible()) {
-        int ret = attack_wrapper();
-        fprintf(stderr, "attack_wrapper() returned %d\n", ret);
+    if (!is_attack_possible()) {
+        g.impossible++;
+        return;
+    }
+    g.possible++;
+    init_d();
+    int sj = setjmp(control_jmp_buffer);
+    if (sj == 0) {
+        enum RIPE_RET ret = attack_wrapper();
+        fprintf(stderr, "attack_wrapper() returned %d (", ret);
+        switch (ret) {
+            case RET_ATTACK_FAIL: fprintf(stderr, "attack failed)\n"); break;
+            case RET_RT_IMPOSSIBLE: g.rtimpossible++; fprintf(stderr, "run-time check says no)\n"); break;
+            case RET_ERR: fprintf(stderr, "setup error)\n"); break;
+            default: fprintf(stderr, "WTF?)\n"); break;
         }
+    } else {
+        if (sj != RET_ATTACK_SUCCESS)
+            fprintf(stderr, "setjmp() returned via longjmp %d (", sj);
+        switch (sj) {
+            case RET_ATTACK_SUCCESS:
+                g.successful++;
+                break;
+            case RET_ATTACK_FAIL:
+                fprintf(stderr, "attack failed)\n");
+                break;
+            default:
+                fprintf(stderr, "WTF?)\n");
+                break;
+        }
+    }
 }
 
 __attribute__ ((noinline)) // Make sure this function has its own stack frame
@@ -1076,15 +1113,15 @@ homebrew_memcpy(void * dst, const void * src, size_t length)
 void
 shellcode_target()
 {
-    printf("success.\nCode injection function reached.\n");
-    exit(0);
+    printf("shellcode_target() reached.\n");
+    longjmp_no_enforce(control_jmp_buffer, RET_ATTACK_SUCCESS);
 }
 
 void
 ret2libc_target()
 {
-    printf("success.\nRet2Libc function reached.\n");
-    exit(0);
+    printf("ret2libc_target() reached.\n");
+    longjmp_no_enforce(control_jmp_buffer, RET_ATTACK_SUCCESS);
 }
 
 void
@@ -1098,9 +1135,10 @@ dop_target(uint8_t * buf, uint32_t auth)
 
     if (!auth_loc) {
         printf("DOP attack failed\n");
+        longjmp_no_enforce(control_jmp_buffer, RET_ATTACK_FAIL);
     } else {
-        printf("success.\nDOP memory corruption reached.\n");
-        exit(0);
+        printf("DOP memory corruption reached.\n");
+        longjmp_no_enforce(control_jmp_buffer, RET_ATTACK_SUCCESS);
     }
 }
 
@@ -1108,8 +1146,8 @@ __attribute__ ((optimize (0))) // Make sure prologue length does not change
 void
 rop_target(void)
 {
-    printf("success.\nROP function reached.\n");
-    exit(0);
+    printf("ROP function reached.\n");
+    longjmp_no_enforce(control_jmp_buffer, RET_ATTACK_SUCCESS);
 }
 
 void
@@ -1155,6 +1193,7 @@ data_leak(uint8_t *buf) {
     if ((strncmp((char *)msg, SECRET_STRING_START, common_len) == 0) &&
         (strcmp((char *)(msg+common_len), loc_string) == 0)) {
         fprintf(stderr, "%s: found correct secret: \"%s\"\n", __func__, msg);
+        longjmp_no_enforce(control_jmp_buffer, RET_ATTACK_SUCCESS);
     }
     fprintf(stderr, "msg does not match secret string\n");
 }

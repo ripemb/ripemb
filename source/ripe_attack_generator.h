@@ -105,6 +105,10 @@ enum RIPE_RET {
     RET_ERR,
 };
 
+extern jmp_buf control_jmp_buffer;
+/* longjmp implementation that does not enforce any security mechanism to
+ * allow undisturbed returning via control_jmp_buffer. */
+void longjmp_no_enforce (jmp_buf, int);
 
 /* BUILD_PAYLOAD()                                                  */
 /*                                                                  */
