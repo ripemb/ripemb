@@ -71,6 +71,8 @@ static struct {
     unsigned int impossible;
     unsigned int rtimpossible;
     unsigned int successful;
+    unsigned int detected;
+    unsigned int illegal_instr;
     struct attack_form attack;
     struct payload payload;
     uint8_t heap_safe[RIPE_HEAP_SAFE_SIZE];
@@ -268,8 +270,8 @@ main(int argc, char ** argv)
             }
         }
     }
-    printf("%d/%d statically possible, %d are dynamically impossible, %d actually worked.\n",
-           g.possible, g.possible+g.impossible, g.rtimpossible, g.successful);
+    printf("%d/%d statically possible, %d are dynamically impossible, %d actually worked, %d were detected, and %d led to illegal instructions.\n",
+           g.possible, g.possible+g.impossible, g.rtimpossible, g.successful, g.detected, g.illegal_instr);
 #endif
 
     return 0;
@@ -306,8 +308,16 @@ attack_once(void) {
             case RET_ATTACK_SUCCESS:
                 g.successful++;
                 break;
+            case RET_ATTACK_DETECTED:
+                g.detected++;
+                fprintf(stderr, "attack detected)\n");
+                break;
             case RET_ATTACK_FAIL:
                 fprintf(stderr, "attack failed)\n");
+                break;
+            case RET_ATTACK_FAIL_ILLEGAL_INSTR:
+                g.illegal_instr++;
+                fprintf(stderr, "illegal instruction)\n");
                 break;
             default:
                 fprintf(stderr, "WTF?)\n");

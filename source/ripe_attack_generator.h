@@ -101,6 +101,8 @@ void restore_heap(uint8_t *heap_safe);
 enum RIPE_RET {
     RET_ATTACK_SUCCESS = 42,
     RET_ATTACK_FAIL,
+    RET_ATTACK_FAIL_ILLEGAL_INSTR,
+    RET_ATTACK_DETECTED,
     RET_RT_IMPOSSIBLE,
     RET_ERR,
 };
