@@ -706,7 +706,7 @@ perform_attack(
      * Note: Here memory will be corrupted                       *
      *************************************************************/
 
-    printf("\nCorrupting data and executing test...\n");
+    printf("Corrupting data and executing test...\n");
 
     uintptr_t attack_ret = 0;
     switch (g.attack.function) {
@@ -826,6 +826,10 @@ build_payload(struct payload * payload, ptrdiff_t offset)
     /* used with string functions in standard library */
     payload->size = (offset + sizeof(uintptr_t) + 1);
 
+    if (g.output_debug_info) {
+        printf("----------------\n");
+    }
+
     switch (g.attack.inject_param) {
         case INJECTED_CODE_NO_NOP:
             if (payload->size < (size_shellcode_nonop + sizeof(func_t*))) {
@@ -884,7 +888,7 @@ build_payload(struct payload * payload, ptrdiff_t offset)
 
     if (g.output_debug_info) {
         fprintf(stderr, "bytes to pad: %zu\n", bytes_to_pad);
-        fprintf(stderr, "\noverflow_ptr: %p\n", payload->overflow_ptr);
+        fprintf(stderr, "overflow_ptr: %p\n", payload->overflow_ptr);
     }
 
     /* Add the address to the direct or indirect target */
@@ -913,8 +917,11 @@ build_payload(struct payload * payload, ptrdiff_t offset)
     /* Finally, add the terminating null character at the end */
     memset((payload->buffer + payload->size - 1), '\0', 1);
     
-    if (g.output_debug_info)
+    if (g.output_debug_info) {
         fprintf(stderr, "payload of %zu bytes created.\n", payload->size);
+        printf("----------------\n");
+    }
+
     return true;
 } /* build_payload */
 
@@ -1088,10 +1095,12 @@ build_shellcode(uint8_t * shellcode)
     addi_s[8] = '\0';
 
     if (g.output_debug_info) {
-        printf("----------------\nShellcode instructions:\n");
+        printf("----------------\n");
+        printf("Shellcode instructions:\n");
         printf("%s0x%-20s%14s\n", "lui t1,  ", high_bits, lui_s);
         printf("%s0x%-20s%10s\n", "addi t1, t1, ", low_bits, addi_s);
         printf("%s%30s%08"PRIx32"\n", "jalr t1", " ", jalr_val);
+        printf("----------------\n");
     }
 } /* build_shellcode */
 
