@@ -1024,6 +1024,22 @@ build_payload(struct payload * payload, ptrdiff_t offset)
           sizeof(void *));
     }
 
+    char *first_null = memchr(payload->buffer, '\0', payload->size-1);
+    if (first_null != NULL) {
+        fprintf(stderr, "Payload contains null character at offset %"PRIdPTR"\n",
+            (uintptr_t)first_null-(uintptr_t)payload->buffer);
+        if (g.attack.function == SSCANF ||
+            g.attack.function == STRCPY ||
+            g.attack.function == STRNCPY ||
+            g.attack.function == SPRINTF ||
+            g.attack.function == SNPRINTF ||
+            g.attack.function == STRCAT ||
+            g.attack.function == STRNCAT) {
+            fprintf(stderr, "This cannot work with string functions, aborting\n");
+            return false;
+        }
+    }
+
     /* Finally, add the terminating null character at the end */
     memset((payload->buffer + payload->size - 1), '\0', 1);
     
