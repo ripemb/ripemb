@@ -23,11 +23,13 @@
 #define RIPE_ATTACK_GENERATOR_H
 
 #include <stdint.h>
+#include <stddef.h>
 #include <setjmp.h>
 #include <stdlib.h>
 #include <stdbool.h>
 
 #define ARR_ELEMS(a) (sizeof(a)/sizeof(a[0]))
+#define PRIxPTR_WIDTH ((int)(sizeof(uintptr_t)*2))
 
 /* Enumerations for typing of attack form parameters                        */
 /* Each enumeration has its own integer space to provide better type safety */

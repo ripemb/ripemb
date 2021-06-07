@@ -396,6 +396,13 @@ perform_attack(
             if (((uintptr_t) heap->heap_buffer1 < (uintptr_t) heap->heap_buffer2) &&
               ((uintptr_t) heap->heap_buffer2 < (uintptr_t) heap->heap_buffer3))
             {
+                if (g.output_debug_info) {
+                    fprintf(stderr,
+                      "heap buffers 1-3: 0x%0*" PRIxPTR ", 0x%0*" PRIxPTR ", 0x%0*" PRIxPTR ".\n",
+                      PRIxPTR_WIDTH, (uintptr_t)heap->heap_buffer1,
+                      PRIxPTR_WIDTH, (uintptr_t)heap->heap_buffer2,
+                      PRIxPTR_WIDTH, (uintptr_t)heap->heap_buffer3);
+                }
                 buffer = heap->heap_buffer1;
                 buf_name = "heap->heap_buffer1";
                 // Set the location of the memory pointer on the heap
