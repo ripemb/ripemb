@@ -212,6 +212,17 @@ lj_func(jmp_buf lj_buf);
 #define OLD_BP_PTR   __builtin_frame_address(0)
 #define RET_ADDR_PTR ((uintptr_t *) OLD_BP_PTR - 1)
 
+void
+set_attack_indices(size_t t, size_t i, size_t c, size_t l, size_t f)
+{
+    printf("Trying %zd/%zd/%zd/%zd/%zd:  ", t, i, c, l, f);
+    printf("%s/%s/%s/%s/%s\n", opt_techniques[t], opt_inject_params[i], opt_code_ptrs[c], opt_locations[l], opt_funcs[f]);
+    g.attack.technique = 100 + t;
+    g.attack.inject_param = 200 + i;
+    g.attack.code_ptr = 300 + c;
+    g.attack.location = 400 + l;
+    g.attack.function = 500 + f;
+}
 
 int
 main(int argc, char ** argv)
@@ -228,8 +239,29 @@ main(int argc, char ** argv)
         fprintf(stderr, "Could not parse command line arguments\n");
         return 1;
     }
-#endif
     attack_once();
+    return 0;
+#endif
+
+#ifndef RIPE_DEF_ONLY
+    for (size_t t = 0; t < nr_of_techniques; t++) {
+        for (size_t i = 0; i < nr_of_inject_params; i++) {
+            for (size_t c = 0; c < nr_of_code_ptrs; c++) {
+                for (size_t l = 0; l < nr_of_locations; l++) {
+                    for (size_t f = 0; f < nr_of_funcs; f++) {
+                        printf("==========================================================================================\n");
+                        set_attack_indices(t, i, c, l, f);
+#else
+#endif
+                        attack_once();
+#ifndef RIPE_DEF_ONLY
+                    }
+                }
+            }
+        }
+    }
+#endif
+
     return 0;
 } /* main */
 
