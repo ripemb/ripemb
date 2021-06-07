@@ -1308,14 +1308,6 @@ is_attack_possible()
                 {
                     print_reason("Error: Impossible to perform a direct attack on the stack into another memory segment.\n");
                     return false;
-                } else if ((g.attack.code_ptr == FUNC_PTR_STACK_PARAM) &&
-                  ((g.attack.function == STRCAT) ||
-                  (g.attack.function == SNPRINTF) ||
-                  (g.attack.function == SSCANF) ||
-                  (g.attack.function == HOMEBREW)))
-                {
-                    print_reason("Error: Impossible to attack the stack parameter directly with the following functions: strcat(), snprintf(), sscanf(), homebrew_memcpy()\n");
-                    return false;
                 }
             }
             break;
@@ -1376,14 +1368,6 @@ is_attack_possible()
               (g.attack.code_ptr == STRUCT_FUNC_PTR_DATA) ))
             {
                 print_reason("Error: Impossible to perform a direct attack on the bss into another memory segment.\n");
-                return false;
-            } else if ((g.attack.technique == INDIRECT) &&
-              (g.attack.code_ptr == LONGJMP_BUF_HEAP) &&
-              (!(g.attack.function == MEMCPY) &&
-              !(g.attack.function == STRNCPY) &&
-              !(g.attack.function == HOMEBREW)))
-            {
-                print_reason("Error: Impossible to perform BSS->Heap Longjmp attacks using string functions.\n");
                 return false;
             }
             break;
