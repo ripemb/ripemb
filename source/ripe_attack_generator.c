@@ -642,6 +642,10 @@ perform_attack(
     char * jump_target_name;
     char * overflow_ptr_name;
     switch (g.attack.inject_param) {
+        case INJECTED_CODE_NO_NOP:
+            g.jump_target = buffer; // shellcode is placed at the beginning of the overflow buffer
+            jump_target_name = "buffer (shellcode)";
+            break;
         case RETURN_INTO_LIBC:
             // simulate ret2libc by invoking mock libc function
             g.jump_target = (void *)(uintptr_t)&ret2libc_target;
@@ -651,9 +655,6 @@ perform_attack(
             g.jump_target = (void *)((uintptr_t)&rop_target + PROLOGUE_LENGTH);
             jump_target_name = "&rop_target + PROLOGUE_LENGTH";
             break;
-        case INJECTED_CODE_NO_NOP:
-            g.jump_target = buffer; // shellcode is placed at the beginning of the overflow buffer
-            jump_target_name = "buffer (shellcode)";
             break;
         case DATA_ONLY:
             // corrupt variable with nonzero value
