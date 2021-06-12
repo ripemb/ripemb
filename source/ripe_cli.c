@@ -13,9 +13,9 @@ __attribute__ ((section (".rodata")))
 const char * const opt_techniques[] = {"direct", "indirect"};
 size_t nr_of_techniques = ARR_ELEMS(opt_techniques);
 
-/* 4 types of injection parameters */
+/* 5 types of injection parameters */
 __attribute__ ((section (".rodata")))
-const char * const opt_inject_params[] = {"shellcode", "returnintolibc", "rop", "dataonly"};
+const char * const opt_inject_params[] = {"shellcode", "returnintolibc", "rop", "return_into_ancestor", "dataonly"};
 size_t nr_of_inject_params = ARR_ELEMS(opt_inject_params);
 
 /* 14 code pointers to overwrite */
@@ -100,6 +100,8 @@ set_inject_param(char * choice, enum inject_params *i)
     } else if (strcmp(choice, opt_inject_params[2]) == 0) {
         *i = RETURN_ORIENTED_PROGRAMMING;
     } else if (strcmp(choice, opt_inject_params[3]) == 0) {
+        return RETURN_INTO_ANCESTOR;
+    } else if (strcmp(choice, opt_inject_params[4]) == 0) {
         return DATA_ONLY;
     } else {
         fprintf(stderr,

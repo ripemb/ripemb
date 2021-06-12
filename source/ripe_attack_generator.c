@@ -53,7 +53,7 @@ static uint8_t shellcode_nonop[12];
 #define MAX_SECRET_LEN (32)
 
 static void attack_once(void);
-static enum RIPE_RET attack_wrapper(void);
+static enum RIPE_RET attack_wrapper(int no_attack);
 static enum RIPE_RET perform_attack(func_t **stack_func_ptr_param,
                                     jmp_buf *stack_jmp_buffer_param);
 static void dummy_function(void);
@@ -281,7 +281,7 @@ attack_once(void) {
     init_d();
     int sj = setjmp(control_jmp_buffer);
     if (sj == 0) {
-        enum RIPE_RET ret = attack_wrapper();
+        enum RIPE_RET ret = attack_wrapper(0);
         fprintf(stderr, "attack_wrapper() returned %d (", ret);
         switch (ret) {
             case RET_ATTACK_FAIL: g.failed++; fprintf(stderr, "attack failed)\n"); break;
@@ -317,7 +317,11 @@ attack_once(void) {
 
 __attribute__ ((noinline)) // Make sure this function has its own stack frame
 static enum RIPE_RET
-attack_wrapper(void) {
+attack_wrapper(int no_attack) {
+    if (no_attack != 0) {
+        printf("return_into_ancestor successful.\n");
+        longjmp_no_enforce(control_jmp_buffer, RET_ATTACK_SUCCESS);
+    }
     jmp_buf stack_jmp_buffer_param;
     func_t *stack_func_ptr_param = dummy_function;
     return perform_attack(&stack_func_ptr_param, &stack_jmp_buffer_param);
@@ -655,6 +659,10 @@ perform_attack(
             g.jump_target = (void *)((uintptr_t)&rop_target + PROLOGUE_LENGTH);
             jump_target_name = "&rop_target + PROLOGUE_LENGTH";
             break;
+        case RETURN_INTO_ANCESTOR:
+            // simulate invoking an "ancestor" function (with a frame somewhere in the stack trace)
+            g.jump_target = (void *)(uintptr_t)&attack_wrapper;
+            jump_target_name = "&attack_wrapper";
             break;
         case DATA_ONLY:
             // corrupt variable with nonzero value
@@ -863,6 +871,7 @@ build_payload(struct payload * payload, ptrdiff_t offset)
             } /* else fall through */
         case RETURN_ORIENTED_PROGRAMMING:
         case RETURN_INTO_LIBC:
+        case RETURN_INTO_ANCESTOR:
             if (payload->size < sizeof(long))
                 return false;
             break;
