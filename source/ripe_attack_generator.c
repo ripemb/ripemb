@@ -87,7 +87,6 @@ jmp_buf control_jmp_buffer; // We use long jmp to get back from attacks.
 static struct {
     uint32_t dop_dest; // FIXME: make this global?
     /* DATA SEGMENT TARGETS
-        Vulnerable struct
         FIXME: sdata is not a thing - unless we can exploit it on some platform productively.
         Overflow buffers (buffer1 for .data, buffer2 for .sdata)
         Arbitrary read data
@@ -96,7 +95,6 @@ static struct {
         Function pointer
         Longjmp buffer
     */
-    struct attackme data_struct;
     uint8_t data_buffer1[256];
     uint8_t data_buffer2[8];
     char data_secret[MAX_SECRET_LEN];
@@ -110,8 +108,6 @@ static void
 init_d(void)
 {
     d.dop_dest = 0xdeadc0de; // data-only target pointer
-
-    d.data_struct = (struct attackme){ "AAAA", &dummy_function };
     strcpy((char *)d.data_buffer1, "d");
     strcpy((char *)d.data_buffer2, "dummy");
     strcpy((char *)d.data_secret, SECRET_STRING_START "DATA");
@@ -121,7 +117,6 @@ init_d(void)
 }
 
 /* BSS TARGETS
-    Vulnerable Struct
     Overflow buffer
     Arbitrary read data
     DOP flag
@@ -130,7 +125,6 @@ init_d(void)
     Longjmp buffer
 */
 struct bss {
-    struct attackme bss_struct;
     uint8_t bss_buffer[256];
     char bss_secret[MAX_SECRET_LEN];
     uint32_t bss_flag;
@@ -142,7 +136,6 @@ struct bss {
 static void
 init_bss(struct bss *b)
 {
-    b->bss_struct = (struct attackme){ "AAAA", &dummy_function };
     b->bss_buffer[0] = '\0';
     strcpy(b->bss_secret, SECRET_STRING_START "BSS");
     b->bss_flag = 0;
@@ -151,7 +144,6 @@ init_bss(struct bss *b)
 }
 
 /* HEAP TARGETS
-    Vulnerable struct
     Overflow buffers
     DOP flag
     Two general pointers for indirect attack
@@ -160,8 +152,6 @@ init_bss(struct bss *b)
     Longjmp buffer
 */
 struct heap_targets {
-    struct attackme * heap_struct;
-
     // FIXME: "slightly" outdated. 3 buffers and no function pointer array
     /* Two buffers declared to be able to chose buffer that gets allocated    */
     /* first on the heap. The other buffer will be set as a target, i.e. a    */
@@ -347,11 +337,9 @@ perform_attack(
         DOP flag
         Arbitrary read data
         Overflow buffer
-        Vulnerable struct
         Long jump buffer
     */
     struct {
-        struct attackme stack_struct;
         uint8_t stack_buffer[1024];
         char stack_secret[MAX_SECRET_LEN];
         uint32_t stack_flag;
@@ -360,7 +348,6 @@ perform_attack(
         jmp_buf stack_jmp_buffer;
     } stack;
     strcpy(stack.stack_secret, SECRET_STRING_START "STACK");
-    stack.stack_struct.func_ptr = &dummy_function;
     stack.stack_func_ptr = &dummy_function;
     stack.stack_flag = 0;
 
@@ -371,20 +358,17 @@ perform_attack(
     }
     memset(heap, 0, sizeof(struct heap_targets));
 
-    heap->heap_struct = malloc(sizeof(*heap->heap_struct));
     heap->heap_buffer1 = malloc(256 + sizeof(long));
     heap->heap_buffer2 = malloc(256 + sizeof(long));
     heap->heap_buffer3 = malloc(256 + sizeof(long));
     heap->heap_flag = malloc(sizeof(int *));
-    if (heap->heap_struct == NULL ||
-        heap->heap_buffer1 == NULL ||
+    if (heap->heap_buffer1 == NULL ||
         heap->heap_buffer2 == NULL ||
         heap->heap_buffer3 == NULL ||
         heap->heap_flag == NULL) {
         fprintf(stderr, "A heap malloc() failed!\n");
         exit(1);
     }
-    heap->heap_struct->func_ptr = &dummy_function;
     heap->heap_func_ptr_ptr = NULL;
     heap->heap_flag = 0;
 
@@ -403,16 +387,8 @@ perform_attack(
 
     switch (g.attack.location) {
         case STACK:
-            // Special case for stack_struct
-            if (g.attack.code_ptr == STRUCT_FUNC_PTR_STACK &&
-              g.attack.technique == DIRECT)
-            {
-                buffer = stack.stack_struct.buffer;
-                buf_name = "stack.stack_struct.buffer";
-            } else {
-                buffer = stack.stack_buffer;
-                buf_name = "stack.stack_buffer";
-            }
+            buffer = stack.stack_buffer;
+            buf_name = "stack.stack_buffer";
 
             // set up stack ptr with DOP target
             if (g.attack.inject_param == DATA_ONLY) {
@@ -426,15 +402,6 @@ perform_attack(
             break;
         case HEAP:
             /* Injection into heap buffer                            */
-
-            // Special case for heap_struct
-            if (g.attack.code_ptr == STRUCT_FUNC_PTR_HEAP &&
-              g.attack.technique == DIRECT)
-            {
-                buffer = heap->heap_struct->buffer;
-                buf_name = "heap->heap_struct->buffer";
-                break;
-            }
 
             if (((uintptr_t) heap->heap_buffer1 < (uintptr_t) heap->heap_buffer2) &&
               ((uintptr_t) heap->heap_buffer2 < (uintptr_t) heap->heap_buffer3))
@@ -477,13 +444,6 @@ perform_attack(
         case DATA:
             /* Injection into data segment buffer                    */
 
-            // Special case for stack_struct
-            if (g.attack.code_ptr == STRUCT_FUNC_PTR_DATA) {
-                buffer = d.data_struct.buffer;
-                buf_name = "d.data_struct.buffer";
-                break;
-            }
-
             if ((g.attack.code_ptr == FUNC_PTR_DATA ||
               g.attack.code_ptr == VAR_BOF) &&
               g.attack.technique == DIRECT)
@@ -505,13 +465,6 @@ perform_attack(
             break;
         case BSS:
             /* Injection into BSS buffer                             */
-
-            // Special case for bss_struct
-            if (g.attack.code_ptr == STRUCT_FUNC_PTR_BSS) {
-                buffer = b.bss_struct.buffer;
-                buf_name = "b.bss_struct.buffer";
-                break;
-            }
 
             buffer = b.bss_buffer;
             buf_name = "b.bss_buffer";
@@ -575,22 +528,6 @@ perform_attack(
                 case LONGJMP_BUF_BSS:
                     target_addr = b.bss_jmp_buffer;
                     target_name = "b.bss_jmp_buffer";
-                    break;
-                case STRUCT_FUNC_PTR_STACK:
-                    target_addr = &stack.stack_struct.func_ptr;
-                    target_name = "&stack.stack_struct.func_ptr";
-                    break;
-                case STRUCT_FUNC_PTR_HEAP:
-                    target_addr = &heap->heap_struct->func_ptr;
-                    target_name = "heap->heap_struct.func_ptr";
-                    break;
-                case STRUCT_FUNC_PTR_DATA:
-                    target_addr = &d.data_struct.func_ptr;
-                    target_name = "&d.data_struct.func_ptr";
-                    break;
-                case STRUCT_FUNC_PTR_BSS:
-                    target_addr = &b.bss_struct.func_ptr;
-                    target_name = "&b.bss_struct.func_ptr";
                     break;
                 case VAR_BOF:
                 // if data-only, location determines target
@@ -851,18 +788,6 @@ perform_attack(
             break;
         case LONGJMP_BUF_BSS:
             lj_func(b.bss_jmp_buffer);
-            break;
-        case STRUCT_FUNC_PTR_STACK:
-            (*stack.stack_struct.func_ptr)();
-            break;
-        case STRUCT_FUNC_PTR_HEAP:
-            (*heap->heap_struct->func_ptr)();
-            break;
-        case STRUCT_FUNC_PTR_DATA:
-            (*d.data_struct.func_ptr)();
-            break;
-        case STRUCT_FUNC_PTR_BSS:
-            (*b.bss_struct.func_ptr)();
             break;
         case VAR_BOF:
         case VAR_IOF:
@@ -1253,10 +1178,7 @@ is_attack_possible()
                   (g.attack.code_ptr == FUNC_PTR_DATA) ||
                   (g.attack.code_ptr == LONGJMP_BUF_HEAP) ||
                   (g.attack.code_ptr == LONGJMP_BUF_DATA) ||
-                  (g.attack.code_ptr == LONGJMP_BUF_BSS) ||
-                  (g.attack.code_ptr == STRUCT_FUNC_PTR_HEAP) ||
-                  (g.attack.code_ptr == STRUCT_FUNC_PTR_DATA) ||
-                  (g.attack.code_ptr == STRUCT_FUNC_PTR_BSS) )
+                  (g.attack.code_ptr == LONGJMP_BUF_BSS) )
                 {
                     print_reason("Error: Impossible to perform a direct attack on the stack into another memory segment.\n");
                     return false;
@@ -1274,10 +1196,7 @@ is_attack_possible()
               (g.attack.code_ptr == LONGJMP_BUF_STACK_VAR) ||
               (g.attack.code_ptr == LONGJMP_BUF_STACK_PARAM) ||
               (g.attack.code_ptr == LONGJMP_BUF_BSS) ||
-              (g.attack.code_ptr == LONGJMP_BUF_DATA) ||
-              (g.attack.code_ptr == STRUCT_FUNC_PTR_STACK) ||
-              (g.attack.code_ptr == STRUCT_FUNC_PTR_DATA) ||
-              (g.attack.code_ptr == STRUCT_FUNC_PTR_BSS) ))
+              (g.attack.code_ptr == LONGJMP_BUF_DATA) ))
             {
                 print_reason("Error: Impossible to perform a direct attack on the heap into another memory segment.\n");
                 return false;
@@ -1294,10 +1213,7 @@ is_attack_possible()
               (g.attack.code_ptr == LONGJMP_BUF_STACK_VAR) ||
               (g.attack.code_ptr == LONGJMP_BUF_STACK_PARAM) ||
               (g.attack.code_ptr == LONGJMP_BUF_HEAP) ||
-              (g.attack.code_ptr == LONGJMP_BUF_BSS) ||
-              (g.attack.code_ptr == STRUCT_FUNC_PTR_STACK) ||
-              (g.attack.code_ptr == STRUCT_FUNC_PTR_HEAP) ||
-              (g.attack.code_ptr == STRUCT_FUNC_PTR_BSS) ))
+              (g.attack.code_ptr == LONGJMP_BUF_BSS) ))
             {
                 print_reason("Error: Impossible to perform a direct attack on the data segment into another memory segment.\n");
                 return false;
@@ -1314,10 +1230,7 @@ is_attack_possible()
               (g.attack.code_ptr == LONGJMP_BUF_STACK_VAR) ||
               (g.attack.code_ptr == LONGJMP_BUF_STACK_PARAM) ||
               (g.attack.code_ptr == LONGJMP_BUF_HEAP) ||
-              (g.attack.code_ptr == LONGJMP_BUF_DATA) ||
-              (g.attack.code_ptr == STRUCT_FUNC_PTR_STACK) ||
-              (g.attack.code_ptr == STRUCT_FUNC_PTR_HEAP) ||
-              (g.attack.code_ptr == STRUCT_FUNC_PTR_DATA) ))
+              (g.attack.code_ptr == LONGJMP_BUF_DATA) ))
             {
                 print_reason("Error: Impossible to perform a direct attack on the bss into another memory segment.\n");
                 return false;

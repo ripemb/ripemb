@@ -18,14 +18,12 @@ __attribute__ ((section (".rodata")))
 const char * const opt_inject_params[] = {"shellcode", "returnintolibc", "rop", "dataonly"};
 size_t nr_of_inject_params = ARR_ELEMS(opt_inject_params);
 
-/* 18 code pointers to overwrite */
+/* 14 code pointers to overwrite */
 __attribute__ ((section (".rodata")))
 const char * const opt_code_ptrs[] = {"ret", "funcptrstackvar", "funcptrstackparam",
                                       "funcptrheap", "funcptrbss", "funcptrdata",
                                       "longjmpstackvar", "longjmpstackparam",
                                       "longjmpheap", "longjmpbss", "longjmpdata",
-                                      "structfuncptrstack","structfuncptrheap",
-                                      "structfuncptrdata","structfuncptrbss",
                                       "bof", "iof", "leak"};
 size_t nr_of_code_ptrs = ARR_ELEMS(opt_code_ptrs);
 
@@ -138,18 +136,10 @@ set_code_ptr(char * choice, enum code_ptrs *c)
     } else if (strcmp(choice, opt_code_ptrs[10]) == 0) {
         *c = LONGJMP_BUF_DATA;
     } else if (strcmp(choice, opt_code_ptrs[11]) == 0) {
-        return STRUCT_FUNC_PTR_STACK;
-    } else if (strcmp(choice, opt_code_ptrs[12]) == 0) {
-        return STRUCT_FUNC_PTR_HEAP;
-    } else if (strcmp(choice, opt_code_ptrs[13]) == 0) {
-        return STRUCT_FUNC_PTR_DATA;
-    } else if (strcmp(choice, opt_code_ptrs[14]) == 0) {
-        return STRUCT_FUNC_PTR_BSS;
-    } else if (strcmp(choice, opt_code_ptrs[15]) == 0) {
         return VAR_BOF;
-    } else if (strcmp(choice, opt_code_ptrs[16]) == 0) {
+    } else if (strcmp(choice, opt_code_ptrs[12]) == 0) {
         return VAR_IOF;
-    } else if (strcmp(choice, opt_code_ptrs[17]) == 0) {
+    } else if (strcmp(choice, opt_code_ptrs[13]) == 0) {
         return VAR_LEAK;
     } else {
         fprintf(stderr, "Error: Unknown choice of code pointer \"%s\"\n",
