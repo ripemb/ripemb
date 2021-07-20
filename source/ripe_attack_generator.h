@@ -41,7 +41,7 @@ enum code_ptrs     {RET_ADDR=300, FUNC_PTR_STACK_VAR, FUNC_PTR_STACK_PARAM,
                     FUNC_PTR_HEAP, FUNC_PTR_BSS, FUNC_PTR_DATA,
                     LONGJMP_BUF_STACK_VAR, LONGJMP_BUF_STACK_PARAM,
                     LONGJMP_BUF_HEAP, LONGJMP_BUF_BSS, LONGJMP_BUF_DATA,
-                    VAR_BOF, VAR_IOF, VAR_LEAK};
+                    VAR_BOF, VAR_LEAK};
 enum locations     {STACK=400, HEAP, BSS, DATA};
 enum functions     {MEMCPY=500, HOMEBREW, SSCANF, STRCPY, STRNCPY, SPRINTF, SNPRINTF,
                     STRCAT, STRNCAT};

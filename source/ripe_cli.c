@@ -18,13 +18,13 @@ __attribute__ ((section (".rodata")))
 const char * const opt_inject_params[] = {"shellcode", "returnintolibc", "rop", "return_into_ancestor", "dataonly"};
 size_t nr_of_inject_params = ARR_ELEMS(opt_inject_params);
 
-/* 14 code pointers to overwrite */
+/* 13 code pointers to overwrite */
 __attribute__ ((section (".rodata")))
 const char * const opt_code_ptrs[] = {"ret", "funcptrstackvar", "funcptrstackparam",
                                       "funcptrheap", "funcptrbss", "funcptrdata",
                                       "longjmpstackvar", "longjmpstackparam",
                                       "longjmpheap", "longjmpbss", "longjmpdata",
-                                      "bof", "iof", "leak"};
+                                      "bof", "leak"};
 size_t nr_of_code_ptrs = ARR_ELEMS(opt_code_ptrs);
 
 /* 4 memory locations */
@@ -140,8 +140,6 @@ set_code_ptr(char * choice, enum code_ptrs *c)
     } else if (strcmp(choice, opt_code_ptrs[11]) == 0) {
         return VAR_BOF;
     } else if (strcmp(choice, opt_code_ptrs[12]) == 0) {
-        return VAR_IOF;
-    } else if (strcmp(choice, opt_code_ptrs[13]) == 0) {
         return VAR_LEAK;
     } else {
         fprintf(stderr, "Error: Unknown choice of code pointer \"%s\"\n",

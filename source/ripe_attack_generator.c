@@ -181,11 +181,7 @@ ret2libc_target(void);
 void
 rop_target(void);
 void
-dop_target(uint8_t * buf, uint32_t auth);
-
-// integer overflow vulnerability
-void
-iof(uint8_t * buf, uint32_t iv);
+dop_target(uint32_t auth);
 
 // arbitrary read bug
 void
@@ -501,8 +497,7 @@ perform_attack(
                     target_name = "b.bss_jmp_buffer";
                     break;
                 case VAR_BOF:
-                // if data-only, location determines target
-                case VAR_IOF:
+                    // if data-only, location determines target
                     switch (g.attack.location) {
                         case STACK:
                             target_addr = &stack.stack_flag;
@@ -766,19 +761,18 @@ perform_attack(
             lj_func(b.bss_jmp_buffer);
             break;
         case VAR_BOF:
-        case VAR_IOF:
             switch (g.attack.location) {
                 case STACK:
-                    dop_target(buffer, * (uint32_t *) stack.stack_mem_ptr);
+                    dop_target(* (uint32_t *) stack.stack_mem_ptr);
                     break;
                 case HEAP:
-                    dop_target(buffer, * (uint32_t *) heap->heap_mem_ptr);
+                    dop_target(* (uint32_t *) heap->heap_mem_ptr);
                     break;
                 case DATA:
-                    dop_target(buffer, * (uint32_t *) d.data_mem_ptr);
+                    dop_target(* (uint32_t *) d.data_mem_ptr);
                     break;
                 case BSS:
-                    dop_target(buffer, * (uint32_t *) b.bss_mem_ptr);
+                    dop_target(* (uint32_t *) b.bss_mem_ptr);
                     break;
             }
             break;
@@ -815,10 +809,6 @@ build_payload(struct payload * payload, ptrdiff_t offset)
             size_shellcode = size_shellcode_nonop;
             break;
         case DATA_ONLY:
-            // 256 padding bytes for unsigned 8bit IOF
-            if (g.attack.code_ptr == VAR_IOF)
-                payload->size = 256 + sizeof(long) + sizeof(char);
-            
             if (g.attack.code_ptr == VAR_LEAK) {
                 /* The buffer stores the offset ORed with a mask and the mask itself,
                  * simulating a data packet with an encoded length field.
@@ -868,12 +858,9 @@ build_payload(struct payload * payload, ptrdiff_t offset)
         fprintf(stderr, "overflow_ptr: %p\n", payload->overflow_ptr);
     }
 
-    /* Add the address to the direct or indirect target */
-    if (g.attack.code_ptr != VAR_IOF) {
-        memcpy(&(payload->buffer[size_shellcode + bytes_to_pad]),
-          &payload->overflow_ptr,
-          sizeof(void *));
-    }
+    memcpy(&(payload->buffer[size_shellcode + bytes_to_pad]),
+           &payload->overflow_ptr,
+           sizeof(void *));
 
     char *first_null = memchr(payload->buffer, '\0', payload->size-1);
     if (first_null != NULL) {
@@ -942,15 +929,9 @@ ret2libc_target()
 }
 
 void
-dop_target(uint8_t * buf, uint32_t auth)
+dop_target(uint32_t auth)
 {
-    size_t auth_loc = auth;
-
-    if (g.attack.code_ptr == VAR_IOF) {
-        iof(buf, (uintptr_t)&auth_loc);
-    }
-
-    if (!auth_loc) {
+    if (!auth) {
         printf("DOP attack failed\n");
         longjmp_no_enforce(control_jmp_buffer, RET_ATTACK_FAIL);
     } else {
@@ -965,25 +946,6 @@ rop_target(void)
 {
     printf("ROP function reached.\n");
     longjmp_no_enforce(control_jmp_buffer, RET_ATTACK_SUCCESS);
-}
-
-void
-iof(uint8_t * buf, uint32_t iv)
-{
-    char * map;
-    uint32_t key = iv;
-    size_t len  = strlen((char *)buf);
-
-    // 0-length allocation and vulenrable hash operations
-    map      = malloc(len * sizeof(uint8_t));
-    if (map == NULL) {
-        fprintf(stderr, "malloc()ing map failed!\n");
-        exit(1);
-    }
-    fprintf(stderr, "%s: allocated %zu B\n", __func__, len * sizeof(uint8_t));
-    key     -= (uintptr_t) map;
-    key     &= (uint16_t) len - 1;
-    map[key] = 0xa1;
 }
 
 void
@@ -1132,15 +1094,14 @@ is_attack_possible()
 
     if (g.attack.inject_param == DATA_ONLY) {
         if (g.attack.code_ptr != VAR_BOF &&
-            g.attack.code_ptr != VAR_IOF &&
             g.attack.code_ptr != VAR_LEAK)
         {
             print_reason("Error: Misused DOP code pointer parameters.\n");
             return false;
         }
 
-        if ((g.attack.code_ptr == VAR_LEAK || g.attack.code_ptr == VAR_IOF) && g.attack.technique == INDIRECT) {
-            print_reason("Error: Impossible to do an indirect int overflow attack.\n");
+        if (g.attack.code_ptr == VAR_LEAK && g.attack.technique == INDIRECT) {
+            print_reason("Error: Impossible to do an indirect leak attack.\n");
             return false;
         }
 
@@ -1149,7 +1110,6 @@ is_attack_possible()
             return false;
         }
     } else if (g.attack.code_ptr == VAR_BOF ||
-               g.attack.code_ptr == VAR_IOF ||
                g.attack.code_ptr == VAR_LEAK) {
         print_reason("Error: Must use \"dataonly\" injection parameter for DOP attacks.\n");
         return false;
