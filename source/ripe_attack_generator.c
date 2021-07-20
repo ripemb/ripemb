@@ -191,10 +191,6 @@ iof(uint8_t * buf, uint32_t iv);
 void
 data_leak(uint8_t *buf);
 
-// forces length param to register and jumps before return for stack param attacks
-void
-homebrew_memcpy_param(void * dst, const void * src, register size_t length);
-
 // longjmp() is called from here
 void
 lj_func(jmp_buf lj_buf);
