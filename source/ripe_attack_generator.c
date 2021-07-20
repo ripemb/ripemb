@@ -1104,11 +1104,6 @@ is_attack_possible()
             print_reason("Error: Impossible to do an indirect leak attack.\n");
             return false;
         }
-
-        if (g.attack.location == HEAP && g.attack.technique == INDIRECT) {
-            print_reason("Error: Impossible to indirect attack the heap flag.\n");
-            return false;
-        }
     } else if (g.attack.code_ptr == VAR_BOF ||
                g.attack.code_ptr == VAR_LEAK) {
         print_reason("Error: Must use \"dataonly\" injection parameter for DOP attacks.\n");
