@@ -1087,12 +1087,6 @@ is_attack_possible()
         return false;
     }
 
-    if (g.attack.inject_param == RETURN_ORIENTED_PROGRAMMING &&
-      g.attack.technique != DIRECT)
-    {
-        print_reason("Error: Impossible (theoretically) to perform indirect ROP attacks\n");
-        return false;
-    }
 
     if (g.attack.inject_param == DATA_ONLY) {
         if (g.attack.code_ptr != VAR_BOF &&
