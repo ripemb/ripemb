@@ -452,94 +452,93 @@ perform_attack(
     }
 
     // Set Target Address
-            switch (g.attack.code_ptr) {
-                case RET_ADDR:
-                    target_addr = RET_ADDR_PTR;
-                    target_name = "RET_ADDR_PTR";
+    switch (g.attack.code_ptr) {
+        case RET_ADDR:
+            target_addr = RET_ADDR_PTR;
+            target_name = "RET_ADDR_PTR";
+            break;
+        case FUNC_PTR_STACK_VAR:
+            target_addr = &stack.stack_func_ptr;
+            target_name = "&stack.stack_func_ptr";
+            break;
+        case FUNC_PTR_STACK_PARAM:
+            target_addr = stack_func_ptr_param;
+            target_name = "stack_func_ptr_param";
+            break;
+        case FUNC_PTR_HEAP:
+            *heap->heap_func_ptr_ptr = &dummy_function;
+            target_addr = heap->heap_func_ptr_ptr;
+            target_name = "heap->heap_func_ptr_ptr";
+            break;
+        case FUNC_PTR_BSS:
+            target_addr = &b.bss_func_ptr;
+            target_name = "&b.bss_func_ptr";
+            break;
+        case FUNC_PTR_DATA:
+            target_addr = &d.data_func_ptr;
+            target_name = "&d.data_func_ptr";
+            break;
+        case LONGJMP_BUF_STACK_VAR:
+            target_addr = stack.stack_jmp_buffer;
+            target_name = "stack.stack_jmp_buffer";
+            break;
+        case LONGJMP_BUF_STACK_PARAM:
+            target_addr = stack_jmp_buffer_param;
+            target_name = "stack_jmp_buffer_param";
+            break;
+        case LONGJMP_BUF_HEAP:
+            target_addr = heap->heap_jmp_buffer;
+            target_name = "heap->heap_jmp_buffer";
+            break;
+        case LONGJMP_BUF_DATA:
+            target_addr = d.data_jmp_buffer;
+            target_name = "d.data_jmp_buffer";
+            break;
+        case LONGJMP_BUF_BSS:
+            target_addr = b.bss_jmp_buffer;
+            target_name = "b.bss_jmp_buffer";
+            break;
+        case VAR_BOF:
+            switch (g.attack.location) {
+                case STACK:
+                    target_addr = &stack.stack_flag;
+                    target_name = "&stack.stack_flag";
                     break;
-                case FUNC_PTR_STACK_VAR:
-                    target_addr = &stack.stack_func_ptr;
-                    target_name = "&stack.stack_func_ptr";
+                case HEAP:
+                    target_addr = heap->heap_flag;
+                    target_name = "heap->heap_flag";
                     break;
-                case FUNC_PTR_STACK_PARAM:
-                    target_addr = stack_func_ptr_param;
-                    target_name = "stack_func_ptr_param";
+                case DATA:
+                    target_addr = &d.data_flag;
+                    target_name = "&d.data_flag";
                     break;
-                case FUNC_PTR_HEAP:
-                    *heap->heap_func_ptr_ptr = &dummy_function;
-                    target_addr = heap->heap_func_ptr_ptr;
-                    target_name = "heap->heap_func_ptr_ptr";
-                    break;
-                case FUNC_PTR_BSS:
-                    target_addr = &b.bss_func_ptr;
-                    target_name = "&b.bss_func_ptr";
-                    break;
-                case FUNC_PTR_DATA:
-                    target_addr = &d.data_func_ptr;
-                    target_name = "&d.data_func_ptr";
-                    break;
-                case LONGJMP_BUF_STACK_VAR:
-                    target_addr = stack.stack_jmp_buffer;
-                    target_name = "stack.stack_jmp_buffer";
-                    break;
-                case LONGJMP_BUF_STACK_PARAM:
-                    target_addr = stack_jmp_buffer_param;
-                    target_name = "stack_jmp_buffer_param";
-                    break;
-                case LONGJMP_BUF_HEAP:
-                    target_addr = heap->heap_jmp_buffer;
-                    target_name = "heap->heap_jmp_buffer";
-                    break;
-                case LONGJMP_BUF_DATA:
-                    target_addr = d.data_jmp_buffer;
-                    target_name = "d.data_jmp_buffer";
-                    break;
-                case LONGJMP_BUF_BSS:
-                    target_addr = b.bss_jmp_buffer;
-                    target_name = "b.bss_jmp_buffer";
-                    break;
-                case VAR_BOF:
-                    // if data-only, location determines target
-                    switch (g.attack.location) {
-                        case STACK:
-                            target_addr = &stack.stack_flag;
-                            target_name = "&stack.stack_flag";
-                            break;
-                        case HEAP:
-                            target_addr = heap->heap_flag;
-                            target_name = "heap->heap_flag";
-                            break;
-                        case DATA:
-                            target_addr = &d.data_flag;
-                            target_name = "&d.data_flag";
-                            break;
-                        case BSS:
-                            target_addr = &b.bss_flag;
-                            target_name = "&b.bss_flag";
-                            break;
-                    }
-                    break;
-                case VAR_LEAK:
-                    switch (g.attack.location) {
-                        case STACK:
-                            target_addr = &stack.stack_secret;
-                            target_name = "&stack.stack_secret";
-                            break;
-                        case HEAP:
-                            target_addr = heap->heap_secret;
-                            target_name = "heap->heap_secret";
-                            break;
-                        case DATA:
-                            target_addr = &d.data_secret;
-                            target_name = "&d.data_secret";
-                            break;
-                        case BSS:
-                            target_addr = &b.bss_secret;
-                            target_name = "&b.bss_secret";
-                            break;
-                    }
+                case BSS:
+                    target_addr = &b.bss_flag;
+                    target_name = "&b.bss_flag";
                     break;
             }
+            break;
+        case VAR_LEAK:
+            switch (g.attack.location) {
+                case STACK:
+                    target_addr = &stack.stack_secret;
+                    target_name = "&stack.stack_secret";
+                    break;
+                case HEAP:
+                    target_addr = heap->heap_secret;
+                    target_name = "heap->heap_secret";
+                    break;
+                case DATA:
+                    target_addr = &d.data_secret;
+                    target_name = "&d.data_secret";
+                    break;
+                case BSS:
+                    target_addr = &b.bss_secret;
+                    target_name = "&b.bss_secret";
+                    break;
+            }
+            break;
+    }
 
     char * of_target_name; // Name of initial overflow target
     switch (g.attack.technique) {
