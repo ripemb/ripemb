@@ -76,6 +76,7 @@ static struct {
     unsigned int possible;
     unsigned int impossible;
     unsigned int rtimpossible;
+    unsigned int error;
     unsigned int successful;
     unsigned int failed;
     unsigned int detected;
@@ -249,8 +250,8 @@ main(int argc, char ** argv)
             }
         }
     }
-    printf("%d/%d statically possible, %d are dynamically impossible, %d actually worked, %d were detected, %d failed, and %d led to illegal instructions.\n",
-           g.possible, g.possible+g.impossible, g.rtimpossible, g.successful, g.detected, g.failed, g.illegal_instr);
+    printf("%d/%d statically possible, %d are dynamically impossible, %d are seriously broken, %d actually worked, %d were detected, %d failed, and %d led to illegal instructions.\n",
+           g.possible, g.possible+g.impossible, g.rtimpossible, g.error, g.successful, g.detected, g.failed, g.illegal_instr);
 #endif
 
     return 0;
@@ -277,8 +278,8 @@ attack_once(void) {
         switch (ret) {
             case RET_ATTACK_FAIL: g.failed++; fprintf(stderr, "attack failed)\n"); break;
             case RET_RT_IMPOSSIBLE: g.rtimpossible++; fprintf(stderr, "run-time check says no)\n"); break;
-            case RET_ERR: fprintf(stderr, "setup error)\n"); break;
-            default: fprintf(stderr, "WTF?)\n"); break;
+            case RET_ERR: g.error++; fprintf(stderr, "setup error)\n"); break;
+            default: g.error++; fprintf(stderr, "WTF?)\n"); break;
         }
     } else {
         if (sj != RET_ATTACK_SUCCESS)
@@ -300,6 +301,7 @@ attack_once(void) {
                 fprintf(stderr, "illegal instruction)\n");
                 break;
             default:
+                g.rtimpossible++;
                 fprintf(stderr, "WTF?)\n");
                 break;
         }
