@@ -228,6 +228,11 @@ main(int argc, char ** argv)
     }
     attack_once();
     return 0;
+#else
+    if (argc > 1) { // argc might be 0 on free-standing implementations
+        fprintf(stderr, "CLI support disabled but %d arguments given\n", argc-1);
+        return 1;
+    }
 #endif
 
 #ifndef RIPE_DEF_ONLY
