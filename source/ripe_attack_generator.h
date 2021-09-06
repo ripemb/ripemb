@@ -85,7 +85,11 @@ extern const char * const opt_funcs[];
 extern size_t nr_of_funcs;
 
 #ifndef RIPE_HEAP_SAFE_SIZE
-    #define RIPE_HEAP_SAFE_SIZE (32*1024)
+    #ifndef RIPE_SAFE_HEAP
+        #define RIPE_HEAP_SAFE_SIZE (1)
+    #else
+        #define RIPE_HEAP_SAFE_SIZE (32*1024)
+    #endif
 #endif
 /* Take a snapshot of to current heap area and save it into heap_safe. */
 void save_heap(uint8_t *heap_safe);

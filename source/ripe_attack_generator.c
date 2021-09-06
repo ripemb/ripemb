@@ -259,6 +259,11 @@ main(int argc, char ** argv)
 
 
 __attribute__ ((weak)) void
+save_heap(uint8_t *heap_safe){}
+__attribute__ ((weak)) void
+restore_heap(uint8_t *heap_safe){}
+
+__attribute__ ((weak)) void
 longjmp_no_enforce (jmp_buf jb, int rv) {
     longjmp(jb, rv);
 }
