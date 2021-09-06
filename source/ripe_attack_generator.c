@@ -946,7 +946,12 @@ dop_target(uint32_t auth)
     }
 }
 
-__attribute__ ((optimize (0))) // Make sure prologue length does not change
+// Make sure prologue length does not change
+#ifdef __clang__
+__attribute__ ((optnone))
+#else
+__attribute__ ((optimize (0)))
+#endif
 void
 rop_target(void)
 {
