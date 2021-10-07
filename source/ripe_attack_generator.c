@@ -68,26 +68,7 @@ static const char *hex_to_bin(char c);
 static void hex_to_string(char * str, size_t val);
 static void format_instruction(uint8_t *dest, size_t insn);
 
-/* To keep mandatory control variables out of harm, we need to make sure their
- * addresses are safe, i.e. are not between overflown buffers and their targets.
- * This is only possible in C by stuffing everything in structs... */
-static struct {
-    bool output_debug_info;
-    unsigned int possible;
-    unsigned int impossible;
-    unsigned int rtimpossible;
-    unsigned int error;
-    unsigned int successful;
-    unsigned int failed;
-    unsigned int detected;
-    unsigned int illegal_instr;
-    struct attack_form attack;
-    struct payload payload;
-    uint8_t heap_safe[RIPE_HEAP_SAFE_SIZE];
-    /* Store target address after and before overflowing for debugging */
-    uintptr_t target, prev_target;
-    void * jump_target, * of_target;
-} g = {
+struct ripe_globals g = {
     .output_debug_info = true,
 };
 jmp_buf control_jmp_buffer; // We use long jmp to get back from attacks.

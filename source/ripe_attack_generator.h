@@ -96,6 +96,27 @@ void save_heap(uint8_t *heap_safe);
 /* Restore the heap area from the snapshot saved in heap_safe. */
 void restore_heap(uint8_t *heap_safe);
 
+/* To keep mandatory control variables out of harm, we need to make sure their
+ * addresses are safe, i.e. are not between overflown buffers and their targets.
+ * This is only possible in C by stuffing everything in structs... */
+extern struct ripe_globals {
+    bool output_debug_info;
+    unsigned int possible;
+    unsigned int impossible;
+    unsigned int rtimpossible;
+    unsigned int error;
+    unsigned int successful;
+    unsigned int failed;
+    unsigned int detected;
+    unsigned int illegal_instr;
+    struct attack_form attack;
+    struct payload payload;
+    uint8_t heap_safe[RIPE_HEAP_SAFE_SIZE];
+    /* Store target address after and before overflowing for debugging */
+    uintptr_t target, prev_target;
+    void * jump_target, * of_target;
+} g;
+
 enum RIPE_RET {
     RET_ATTACK_SUCCESS = 42,
     RET_ATTACK_FAIL,
