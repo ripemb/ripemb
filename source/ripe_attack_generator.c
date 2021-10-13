@@ -27,10 +27,13 @@
 
 // For RETURN_ORIENTED_PROGRAMMING we skip over the prologue code of
 // rop_target() to simulate return-oriented programming gadget
+#ifndef PROLOGUE_OFF
+  #define PROLOGUE_OFF 0
+#endif
 #ifdef __riscv_compressed
-  #define PROLOGUE_LENGTH 8
+  #define PROLOGUE_LENGTH (8+PROLOGUE_OFF)
 #else
-  #define PROLOGUE_LENGTH 16
+  #define PROLOGUE_LENGTH (16+PROLOGUE_OFF)
 #endif
 
 #define SECRET_STRING_START "Secret data "
