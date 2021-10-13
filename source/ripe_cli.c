@@ -61,15 +61,15 @@ int parse_ripe_params(int argc, char ** argv, struct attack_form *attack, bool *
                 break;
             case 'd':
                 *debug = true;
-                fprintf(stderr, "debug info enabled\n");
+                dbg("debug info enabled\n");
                 break;
             default:
                 return 1;
         }
     }
     if (argv[optind] != NULL) {
-        fprintf(stderr, "Error: unknown argument(s) after options: \"%s\"\n",
-          argv[optind]);
+        err("Error: unknown argument(s) after options: \"%s\"\n",
+            argv[optind]);
         return 1;
     }
     return rv;
@@ -83,8 +83,8 @@ set_technique(char * choice, enum techniques *t)
     } else if (strcmp(choice, opt_techniques[1]) == 0) {
         *t =  INDIRECT;
     } else {
-        fprintf(stderr, "Error: Unknown choice of technique \"%s\"\n",
-          choice);
+        err("Error: Unknown choice of technique \"%s\"\n",
+            choice);
         return 1;
     }
     return 0;
@@ -104,9 +104,8 @@ set_inject_param(char * choice, enum inject_params *i)
     } else if (strcmp(choice, opt_inject_params[4]) == 0) {
         return DATA_ONLY;
     } else {
-        fprintf(stderr,
-          "Error: Unknown choice of injection parameter \"%s\"\n",
-          choice);
+        err("Error: Unknown choice of injection parameter \"%s\"\n",
+            choice);
         return 1;
     }
     return 0;
@@ -142,8 +141,8 @@ set_code_ptr(char * choice, enum code_ptrs *c)
     } else if (strcmp(choice, opt_code_ptrs[12]) == 0) {
         return VAR_LEAK;
     } else {
-        fprintf(stderr, "Error: Unknown choice of code pointer \"%s\"\n",
-          choice);
+        err("Error: Unknown choice of code pointer \"%s\"\n",
+            choice);
         return 1;
     }
     return 0;
@@ -161,8 +160,8 @@ set_location(char * choice, enum locations *l)
     } else if (strcmp(choice, opt_locations[3]) == 0) {
         *l = DATA;
     } else {
-        fprintf(stderr, "Error: Unknown choice of memory location \"%s\"\n",
-          choice);
+        err("Error: Unknown choice of memory location \"%s\"\n",
+            choice);
         return 1;
     }
     return 0;
@@ -190,9 +189,8 @@ set_function(char * choice, enum functions *f)
     } else if (strcmp(choice, opt_funcs[8]) == 0) {
         *f = STRNCAT;
     } else {
-        fprintf(stderr,
-          "Error: Unknown choice of vulnerable function \"%s\"\n",
-          choice);
+        err("Error: Unknown choice of vulnerable function \"%s\"\n",
+            choice);
         return 1;
     }
     return 0;

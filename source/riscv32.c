@@ -99,14 +99,12 @@ build_shellcode(uint8_t **shellcode, size_t *size_shellcode)
     hex_to_string(addi_s, addi_val);
     addi_s[8] = '\0';
 
-    if (g.output_debug_info) {
-        printf("----------------\n");
-        printf("Shellcode instructions:\n");
-        printf("%s0x%-20s%14s\n", "lui t1,  ", high_bits, lui_s);
-        printf("%s0x%-20s%10s\n", "addi t1, t1, ", low_bits, addi_s);
-        printf("%s%30s%08"PRIx32"\n", "jalr t1", " ", jalr_val);
-        printf("----------------\n");
-    }
+    dbg("----------------\n");
+    dbg("Shellcode instructions:\n");
+    dbg("%s0x%-20s%14s\n", "lui t1,  ", high_bits, lui_s);
+    dbg("%s0x%-20s%10s\n", "addi t1, t1, ", low_bits, addi_s);
+    dbg("%s%30s%08"PRIx32"\n", "jalr t1", " ", jalr_val);
+    dbg("----------------\n");
 }
 
 static const char *

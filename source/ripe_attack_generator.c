@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdarg.h>
 #include <setjmp.h>
 #include <inttypes.h>
 
@@ -143,10 +144,30 @@ lj_func(jmp_buf lj_buf);
 #define RET_ADDR_PTR ((uintptr_t *) OLD_BP_PTR - 1)
 
 void
+dbg(const char *fmt, ...)
+{
+    if (!g.output_debug_info)
+        return;
+    va_list ap;
+    va_start(ap, fmt);
+    vfprintf(stderr, fmt, ap);
+    va_end(ap);
+}
+
+void
+err(const char *fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    vfprintf(stderr, fmt, ap);
+    va_end(ap);
+}
+
+void
 set_attack_indices(size_t t, size_t i, size_t c, size_t l, size_t f)
 {
-    printf("Trying %zu/%zu/%zu/%zu/%zu:  ", t, i, c, l, f);
-    printf("%s/%s/%s/%s/%s\n", opt_techniques[t], opt_inject_params[i], opt_code_ptrs[c], opt_locations[l], opt_funcs[f]);
+    printf("Trying %s/%s/%s/%s/%s\n", opt_techniques[t], opt_inject_params[i], opt_code_ptrs[c], opt_locations[l], opt_funcs[f]);
+    dbg("%zu/%zu/%zu/%zu/%zu\n", t, i, c, l, f);
     g.attack.technique = 100 + t;
     g.attack.inject_param = 200 + i;
     g.attack.code_ptr = 300 + c;
@@ -168,14 +189,14 @@ main(int argc, char ** argv)
 
 #ifndef RIPE_NO_CLI
     if (parse_ripe_params(argc, argv, &g.attack, &g.output_debug_info) != 0) {
-        fprintf(stderr, "Could not parse command line arguments\n");
+        err("Could not parse command line arguments\n");
         return 1;
     }
     attack_once();
     return 0;
 #else
     if (argc > 1) { // argc might be 0 on free-standing implementations
-        fprintf(stderr, "CLI support disabled but %d arguments given\n", argc-1);
+        err("CLI support disabled but %d arguments given\n", argc-1);
         return 1;
     }
 #endif
@@ -186,7 +207,7 @@ main(int argc, char ** argv)
             for (size_t c = 0; c < nr_of_code_ptrs; c++) {
                 for (size_t l = 0; l < nr_of_locations; l++) {
                     for (size_t f = 0; f < nr_of_funcs; f++) {
-                        printf("==========================================================================================\n");
+                        dbg("==========================================================================================\n");
                         set_attack_indices(t, i, c, l, f);
 #else
 #endif
@@ -229,35 +250,36 @@ attack_once(void) {
     int sj = setjmp(control_jmp_buffer);
     if (sj == 0) {
         enum RIPE_RET ret = attack_wrapper(0);
-        fprintf(stderr, "attack_wrapper() returned %d (", ret);
+        dbg("attack_wrapper() returned %d (", ret);
         switch (ret) {
-            case RET_ATTACK_FAIL: g.failed++; fprintf(stderr, "attack failed)\n"); break;
-            case RET_RT_IMPOSSIBLE: g.rtimpossible++; fprintf(stderr, "run-time check says no)\n"); break;
-            case RET_ERR: g.error++; fprintf(stderr, "setup error)\n"); break;
-            default: g.error++; fprintf(stderr, "WTF?)\n"); break;
+            case RET_ATTACK_FAIL: g.failed++; dbg("attack failed)\n"); break;
+            case RET_RT_IMPOSSIBLE: g.rtimpossible++; dbg("run-time check says no)\n"); break;
+            case RET_ERR: g.error++; dbg("setup error)\n"); break;
+            default: g.error++; err("WTF?)\n"); break;
         }
     } else {
         if (sj != RET_ATTACK_SUCCESS)
-            fprintf(stderr, "setjmp() returned via longjmp %d (", sj);
+            dbg("setjmp() returned via longjmp %d (", sj);
         switch (sj) {
             case RET_ATTACK_SUCCESS:
                 g.successful++;
                 break;
             case RET_ATTACK_DETECTED:
                 g.detected++;
-                fprintf(stderr, "attack detected)\n");
+                dbg("attack detected)\n");
                 break;
             case RET_ATTACK_FAIL:
                 g.failed++;
-                fprintf(stderr, "attack failed)\n");
+                dbg("attack failed)\n");
                 break;
             case RET_ATTACK_FAIL_ILLEGAL_INSTR:
                 g.illegal_instr++;
-                fprintf(stderr, "illegal instruction)\n");
+                dbg("illegal instruction)\n");
                 break;
             default:
                 g.rtimpossible++;
-                fprintf(stderr, "WTF?)\n");
+                dbg(") ");
+                err("WTF?\n");
                 break;
         }
     }
@@ -267,7 +289,7 @@ __attribute__ ((noinline)) // Make sure this function has its own stack frame
 static enum RIPE_RET
 attack_wrapper(int no_attack) {
     if (no_attack != 0) {
-        printf("return_into_ancestor successful.\n");
+        printf("Attack succeeded: return_into_ancestor successful.\n");
         longjmp_no_enforce(control_jmp_buffer, RET_ATTACK_SUCCESS);
     }
     jmp_buf stack_jmp_buffer_param;
@@ -305,7 +327,7 @@ perform_attack(
 
     struct heap_targets * heap = malloc(sizeof(struct heap_targets));
     if (heap == NULL) {
-        fprintf(stderr, "malloc()ing heap_targets failed!\n");
+        err("malloc()ing heap_targets failed!\n");
         exit(1);
     }
     memset(heap, 0, sizeof(struct heap_targets));
@@ -314,7 +336,7 @@ perform_attack(
     heap->heap_buffer2 = malloc(BUF_LEN + sizeof(long));
     if (heap->heap_buffer1 == NULL ||
         heap->heap_buffer2 == NULL) {
-        fprintf(stderr, "A heap malloc() failed!\n");
+        err("A heap malloc() failed!\n");
         exit(1);
     }
     heap->heap_jmp_buffer = (jmp_buf *)heap->heap_buffer2;
@@ -353,12 +375,9 @@ perform_attack(
 
             if ((uintptr_t) heap->heap_buffer1 < (uintptr_t) heap->heap_buffer2)
             {
-                if (g.output_debug_info) {
-                    fprintf(stderr,
-                      "heap buffers: 0x%0*" PRIxPTR ", 0x%0*" PRIxPTR ".\n",
-                      PRIxPTR_WIDTH, (uintptr_t)heap->heap_buffer1,
-                      PRIxPTR_WIDTH, (uintptr_t)heap->heap_buffer2);
-                }
+                dbg("heap buffers: 0x%0*" PRIxPTR ", 0x%0*" PRIxPTR ".\n",
+                    PRIxPTR_WIDTH, (uintptr_t)heap->heap_buffer1,
+                    PRIxPTR_WIDTH, (uintptr_t)heap->heap_buffer2);
                 buffer = heap->heap_buffer1;
                 buf_name = "heap->heap_buffer1";
                 // Set the location of the memory pointer on the heap
@@ -369,10 +388,7 @@ perform_attack(
                     strcpy(heap->heap_secret, SECRET_STRING_START "HEAP");
                 }
             } else {
-                if (g.output_debug_info) {
-                    fprintf(stderr,
-                      "Error: Heap buffers allocated in the wrong order.\n");
-                }
+                err("Error: Heap buffers allocated in the wrong order.\n");
                 return RET_ERR;
             }
 
@@ -591,7 +607,7 @@ perform_attack(
             break;
         default:
             if (g.output_debug_info) {
-                fprintf(stderr, "Unknown choice of attack code");
+                err("Unknown choice of attack code");
                 return RET_ERR;
             }
     }
@@ -606,16 +622,16 @@ perform_attack(
             break;
     }
     if (g.output_debug_info) {
-        fprintf(stderr, "buffer (%s) == %p\n", buf_name, (void *)buffer);
-        fprintf(stderr, "of_target (%s) == %p\n", of_target_name, g.of_target);
-        fprintf(stderr, "jump_target (%s) == %p\n", jump_target_name, g.jump_target);
-        fprintf(stderr, "overflow_ptr (%s) == %p\n", overflow_ptr_name, g.payload.overflow_ptr);
+        dbg("buffer (%s) == %p\n", buf_name, (void *)buffer);
+        dbg("of_target (%s) == %p\n", of_target_name, g.of_target);
+        dbg("jump_target (%s) == %p\n", jump_target_name, g.jump_target);
+        dbg("overflow_ptr (%s) == %p\n", overflow_ptr_name, g.payload.overflow_ptr);
     }
     g.prev_target = *(uintptr_t *)g.of_target;
     ptrdiff_t target_offset = (uintptr_t)g.of_target - (uintptr_t)buffer;
     if (target_offset < 0) {
         if (g.output_debug_info)
-            fprintf(stderr, "of_target (0x%0*" PRIxPTR ") has to be > buffer (0x%0*" PRIxPTR "), but isn't.\n",
+            err("of_target (0x%0*" PRIxPTR ") has to be > buffer (0x%0*" PRIxPTR "), but isn't.\n",
               PRIxPTR_WIDTH, (uintptr_t)g.of_target, PRIxPTR_WIDTH, (uintptr_t)buffer);
         return RET_ERR;
     }
@@ -626,7 +642,7 @@ perform_attack(
 
     if (!build_payload(&g.payload, target_offset, shellcode, size_shellcode)) {
         if (g.output_debug_info)
-            fprintf(stderr, "Error: Could not build payload\n");
+            err("Error: Could not build payload\n");
         return RET_RT_IMPOSSIBLE;
     }
 
@@ -635,7 +651,7 @@ perform_attack(
      * Note: Here memory will be corrupted                       *
      *************************************************************/
 
-    printf("Corrupting data and executing test...\n");
+    dbg("Corrupting data and executing test...\n");
 
     uintptr_t attack_ret = 0;
     switch (g.attack.function) {
@@ -672,11 +688,11 @@ perform_attack(
             break;
         default:
             if (g.output_debug_info)
-                fprintf(stderr, "Error: Unknown choice of function\n");
+                err("Error: Unknown choice of function\n");
             return RET_ERR;
     }
-    if (attack_ret != 0 && g.output_debug_info)
-        fprintf(stderr, "attack function returned %"PRIdPTR"/0x%"PRIxPTR"\n", attack_ret, attack_ret);
+    if (attack_ret != 0)
+        dbg("attack function returned %"PRIdPTR"/0x%"PRIxPTR"\n", attack_ret, attack_ret);
 
     /***********************************************
      * Overwrite code pointer for indirect attacks *
@@ -751,9 +767,7 @@ build_payload(struct payload * payload, ptrdiff_t offset, uint8_t * shellcode, s
     /* used with string functions in standard library */
     payload->size = (offset + sizeof(uintptr_t) + 1);
 
-    if (g.output_debug_info) {
-        printf("----------------\n");
-    }
+    dbg("----------------\n");
 
     switch (g.attack.inject_param) {
         case INJECTED_CODE_NO_NOP:
@@ -769,7 +783,7 @@ build_payload(struct payload * payload, ptrdiff_t offset, uint8_t * shellcode, s
                 payload->size = 2*sizeof(size_t) + sizeof(char);
                 payload->buffer = malloc(payload->size);
                 if (payload->buffer == NULL) {
-                    fprintf(stderr, "malloc()ing payload->buffer failed!\n");
+                    err("malloc()ing payload->buffer failed!\n");
                     exit(1);
                 }
 
@@ -791,7 +805,7 @@ build_payload(struct payload * payload, ptrdiff_t offset, uint8_t * shellcode, s
     /* Allocate payload buffer */
     payload->buffer = malloc(payload->size);
     if (payload->buffer == NULL) {
-        fprintf(stderr, "malloc()ing payload->buffer failed!\n");
+        err("malloc()ing payload->buffer failed!\n");
         exit(1);
     }
 
@@ -807,8 +821,8 @@ build_payload(struct payload * payload, ptrdiff_t offset, uint8_t * shellcode, s
     memset((payload->buffer + size_shellcode), 'A', bytes_to_pad);
 
     if (g.output_debug_info) {
-        fprintf(stderr, "bytes to pad: %zu\n", bytes_to_pad);
-        fprintf(stderr, "overflow_ptr: %p\n", payload->overflow_ptr);
+        dbg("bytes to pad: %zu\n", bytes_to_pad);
+        dbg("overflow_ptr: %p\n", payload->overflow_ptr);
     }
 
     memcpy(&(payload->buffer[size_shellcode + bytes_to_pad]),
@@ -817,8 +831,10 @@ build_payload(struct payload * payload, ptrdiff_t offset, uint8_t * shellcode, s
 
     char *first_null = memchr(payload->buffer, '\0', payload->size-1);
     if (first_null != NULL) {
-        fprintf(stderr, "Payload contains null character at offset %"PRIdPTR"\n",
-            (uintptr_t)first_null-(uintptr_t)payload->buffer);
+        if (g.output_debug_info)
+            dbg("Payload contains null character at offset %"PRIdPTR"\n",
+                (uintptr_t)first_null-(uintptr_t)payload->buffer);
+
         if (g.attack.function == SSCANF ||
             g.attack.function == STRCPY ||
             g.attack.function == STRNCPY ||
@@ -826,7 +842,8 @@ build_payload(struct payload * payload, ptrdiff_t offset, uint8_t * shellcode, s
             g.attack.function == SNPRINTF ||
             g.attack.function == STRCAT ||
             g.attack.function == STRNCAT) {
-            fprintf(stderr, "This cannot work with string functions, aborting\n");
+            if (g.output_debug_info)
+                dbg("This cannot work with string functions, aborting\n");
             return false;
         }
     }
@@ -835,8 +852,8 @@ build_payload(struct payload * payload, ptrdiff_t offset, uint8_t * shellcode, s
     memset((payload->buffer + payload->size - 1), '\0', 1);
     
     if (g.output_debug_info) {
-        fprintf(stderr, "payload of %zu bytes created.\n", payload->size);
-        printf("----------------\n");
+        dbg("payload of %zu bytes created.\n", payload->size);
+        dbg("----------------\n");
     }
 
     return true;
@@ -870,14 +887,14 @@ homebrew_memcpy(void * dst, const void * src, size_t length)
 void
 shellcode_target()
 {
-    printf("shellcode_target() reached.\n");
+    printf("Attack succeeded: shellcode_target() reached.\n");
     longjmp_no_enforce(control_jmp_buffer, RET_ATTACK_SUCCESS);
 }
 
 void
 ret2libc_target()
 {
-    printf("ret2libc_target() reached.\n");
+    printf("Attack succeeded: ret2libc_target() reached.\n");
     longjmp_no_enforce(control_jmp_buffer, RET_ATTACK_SUCCESS);
 }
 
@@ -885,10 +902,10 @@ void
 dop_target(uint32_t auth)
 {
     if (!auth) {
-        printf("DOP attack failed\n");
+        dbg("DOP attack failed\n");
         longjmp_no_enforce(control_jmp_buffer, RET_ATTACK_FAIL);
     } else {
-        printf("DOP memory corruption reached.\n");
+        printf("Attack succeeded: DOP memory corruption reached.\n");
         longjmp_no_enforce(control_jmp_buffer, RET_ATTACK_SUCCESS);
     }
 }
@@ -902,7 +919,7 @@ __attribute__ ((optimize (0)))
 void
 rop_target(void)
 {
-    printf("ROP function reached.\n");
+    printf("Attack succeeded: ROP function reached.\n");
     longjmp_no_enforce(control_jmp_buffer, RET_ATTACK_SUCCESS);
 }
 
@@ -913,10 +930,10 @@ data_leak(uint8_t *buf) {
     size = (size & ~0x01010101) | (0x01010101 & mask);
     uint8_t *msg = malloc(size);
     if (msg == NULL) {
-        fprintf(stderr, "malloc()ing data_leak buffer failed!\n");
+        err("malloc()ing data_leak buffer failed!\n");
         exit(1);
     }
-    fprintf(stderr, "%s: allocated %zu B\n", __func__, size);
+    dbg("%s: allocated %zu B\n", __func__, size);
 
     size_t common_len = strlen(SECRET_STRING_START);
     const char *loc_string;
@@ -926,7 +943,7 @@ data_leak(uint8_t *buf) {
         case HEAP: loc_string = "HEAP"; break;
         case STACK: loc_string = "STACK"; break;
         default:
-            fprintf(stderr, "%s: location %d not implemented.\n",
+            err("%s: location %d not implemented.\n",
             __func__, g.attack.location);
             return;
     }
@@ -934,10 +951,10 @@ data_leak(uint8_t *buf) {
     memcpy(msg, buf + size, size);
     if ((strncmp((char *)msg, SECRET_STRING_START, common_len) == 0) &&
         (strcmp((char *)(msg+common_len), loc_string) == 0)) {
-        fprintf(stderr, "%s: found correct secret: \"%s\"\n", __func__, msg);
+        printf("Attack succeeded: found correct secret: \"%s\"\n", msg);
         longjmp_no_enforce(control_jmp_buffer, RET_ATTACK_SUCCESS);
     }
-    fprintf(stderr, "msg does not match secret string\n");
+    dbg("msg does not match secret string\n");
 }
 
 bool

@@ -130,6 +130,10 @@ enum RIPE_RET {
 
 extern struct ripe_globals g;
 
+/* Print out only if output_debug_info is set */
+void dbg(const char *fmt, ...) __attribute__((format(__printf__, 1, 2)));
+void err(const char *fmt, ...) __attribute__((format(__printf__, 1, 2)));
+
 extern jmp_buf control_jmp_buffer;
 /* longjmp implementation that does not enforce any security mechanism to
  * allow undisturbed returning via control_jmp_buffer. */
