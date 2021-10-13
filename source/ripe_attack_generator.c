@@ -249,7 +249,9 @@ attack_once(void) {
     init_d();
     int sj = setjmp(control_jmp_buffer);
     if (sj == 0) {
+        SETUP_PROTECTION();
         enum RIPE_RET ret = attack_wrapper(0);
+        DISABLE_PROTECTION();
         dbg("attack_wrapper() returned %d (", ret);
         switch (ret) {
             case RET_ATTACK_FAIL: g.failed++; dbg("attack failed)\n"); break;
@@ -258,6 +260,7 @@ attack_once(void) {
             default: g.error++; err("WTF?)\n"); break;
         }
     } else {
+        DISABLE_PROTECTION();
         if (sj != RET_ATTACK_SUCCESS)
             dbg("setjmp() returned via longjmp %d (", sj);
         switch (sj) {
@@ -289,6 +292,7 @@ __attribute__ ((noinline)) // Make sure this function has its own stack frame
 static enum RIPE_RET
 attack_wrapper(int no_attack) {
     if (no_attack != 0) {
+        DISABLE_PROTECTION();
         printf("Attack succeeded: return_into_ancestor successful.\n");
         longjmp_no_enforce(control_jmp_buffer, RET_ATTACK_SUCCESS);
     }
@@ -545,6 +549,7 @@ perform_attack(
     switch (g.attack.code_ptr) {
         case LONGJMP_BUF_STACK_VAR:
             if (setjmp(stack.stack_jmp_buffer) != 0) {
+                DISABLE_PROTECTION();
                 /* setjmp() returns 0 if returning directly and non-zero when returning */
                 /* from longjmp() using the saved context. Attack failed.               */
                 printf("Longjmp attack failed. Returning normally...\n");
@@ -553,24 +558,28 @@ perform_attack(
             break;
         case LONGJMP_BUF_STACK_PARAM:
             if (setjmp(*stack_jmp_buffer_param) != 0) {
+                DISABLE_PROTECTION();
                 printf("Longjmp attack failed. Returning normally...\n");
                 return RET_ATTACK_FAIL;
             }
             break;
         case LONGJMP_BUF_HEAP:
             if (setjmp(*heap->heap_jmp_buffer) != 0) {
+                DISABLE_PROTECTION();
                 printf("Longjmp attack failed. Returning normally...\n");
                 return RET_ATTACK_FAIL;
             }
             break;
         case LONGJMP_BUF_DATA:
             if (setjmp(d.data_jmp_buffer) != 0) {
+                DISABLE_PROTECTION();
                 printf("Longjmp attack failed. Returning normally...\n");
                 return RET_ATTACK_FAIL;
             }
             break;
         case LONGJMP_BUF_BSS:
             if (setjmp(b.bss_jmp_buffer) != 0) {
+                DISABLE_PROTECTION();
                 printf("Longjmp attack failed. Returning normally...\n");
                 return RET_ATTACK_FAIL;
             }
@@ -887,6 +896,7 @@ homebrew_memcpy(void * dst, const void * src, size_t length)
 void
 shellcode_target()
 {
+    DISABLE_PROTECTION();
     printf("Attack succeeded: shellcode_target() reached.\n");
     longjmp_no_enforce(control_jmp_buffer, RET_ATTACK_SUCCESS);
 }
@@ -894,6 +904,7 @@ shellcode_target()
 void
 ret2libc_target()
 {
+    DISABLE_PROTECTION();
     printf("Attack succeeded: ret2libc_target() reached.\n");
     longjmp_no_enforce(control_jmp_buffer, RET_ATTACK_SUCCESS);
 }
@@ -902,9 +913,11 @@ void
 dop_target(uint32_t auth)
 {
     if (!auth) {
+        DISABLE_PROTECTION();
         dbg("DOP attack failed\n");
         longjmp_no_enforce(control_jmp_buffer, RET_ATTACK_FAIL);
     } else {
+        DISABLE_PROTECTION();
         printf("Attack succeeded: DOP memory corruption reached.\n");
         longjmp_no_enforce(control_jmp_buffer, RET_ATTACK_SUCCESS);
     }
@@ -919,6 +932,7 @@ __attribute__ ((optimize (0)))
 void
 rop_target(void)
 {
+    DISABLE_PROTECTION();
     printf("Attack succeeded: ROP function reached.\n");
     longjmp_no_enforce(control_jmp_buffer, RET_ATTACK_SUCCESS);
 }
@@ -949,6 +963,7 @@ data_leak(uint8_t *buf) {
     }
 
     memcpy(msg, buf + size, size);
+    DISABLE_PROTECTION();
     if ((strncmp((char *)msg, SECRET_STRING_START, common_len) == 0) &&
         (strcmp((char *)(msg+common_len), loc_string) == 0)) {
         printf("Attack succeeded: found correct secret: \"%s\"\n", msg);
