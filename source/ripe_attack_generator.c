@@ -36,6 +36,8 @@
 #ifndef DISABLE_PROTECTION
     #define DISABLE_PROTECTION() do{;}while(0)
 #endif
+#define JUST_SOME_INSTRUCTIONS() for(volatile int _i=0;_i<3;_i++)
+
 static void attack_once(void);
 static enum RIPE_RET attack_wrapper(int no_attack);
 static enum RIPE_RET perform_attack(func_t **stack_func_ptr_param,
@@ -297,6 +299,7 @@ attack_wrapper(int no_attack) {
     if (no_attack != 0) {
         empty_func(); // Enforce function call-related instructions
 ancestor_ret:
+        JUST_SOME_INSTRUCTIONS();
         DISABLE_PROTECTION();
         printf("Attack succeeded: return_into_ancestor successful.\n");
         longjmp_no_enforce(control_jmp_buffer, RET_ATTACK_SUCCESS);
@@ -910,6 +913,7 @@ homebrew_memcpy(void * dst, const void * src, size_t length)
 void
 shellcode_target()
 {
+    JUST_SOME_INSTRUCTIONS();
     DISABLE_PROTECTION();
     printf("Attack succeeded: shellcode_target() reached.\n");
     longjmp_no_enforce(control_jmp_buffer, RET_ATTACK_SUCCESS);
@@ -918,6 +922,7 @@ shellcode_target()
 void
 ret2libc_target()
 {
+    JUST_SOME_INSTRUCTIONS();
     DISABLE_PROTECTION();
     printf("Attack succeeded: ret2libc_target() reached.\n");
     longjmp_no_enforce(control_jmp_buffer, RET_ATTACK_SUCCESS);
@@ -926,6 +931,7 @@ ret2libc_target()
 void
 dop_target(uint32_t auth)
 {
+    JUST_SOME_INSTRUCTIONS();
     if (!auth) {
         DISABLE_PROTECTION();
         dbg("DOP attack failed\n");
@@ -946,6 +952,7 @@ __attribute__ ((optimize (0)))
 void
 rop_target(void)
 {
+    JUST_SOME_INSTRUCTIONS();
     DISABLE_PROTECTION();
     printf("Attack succeeded: ROP function reached.\n");
     longjmp_no_enforce(control_jmp_buffer, RET_ATTACK_SUCCESS);
