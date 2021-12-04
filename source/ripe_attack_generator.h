@@ -35,7 +35,7 @@
 /* Each enumeration has its own integer space to provide better type safety */
 enum techniques    {DIRECT=100, INDIRECT};
 enum inject_params {INJECTED_CODE_NO_NOP=200, RETURN_INTO_LIBC,
-                    RETURN_ORIENTED_PROGRAMMING, RETURN_INTO_ANCESTOR, DATA_ONLY};
+                    RETURN_ORIENTED_PROGRAMMING, RETURN_INTO_ANCESTOR, RETURN_INTO_ANCESTOR_ROP, DATA_ONLY};
 
 enum code_ptrs     {RET_ADDR=300, FUNC_PTR_STACK_VAR, FUNC_PTR_STACK_PARAM,
                     FUNC_PTR_HEAP, FUNC_PTR_BSS, FUNC_PTR_DATA,
@@ -116,7 +116,7 @@ extern struct ripe_globals {
     uint8_t heap_safe[RIPE_HEAP_SAFE_SIZE];
     /* Store target address after and before overflowing for debugging */
     uintptr_t target, prev_target;
-    void * jump_target, * of_target;
+    void * jump_target, * of_target, * ancestor_ret;
 } g;
 
 enum RIPE_RET {

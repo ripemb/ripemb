@@ -288,16 +288,24 @@ attack_once(void) {
     }
 }
 
+__attribute__ ((noinline))
+static void empty_func(void){__asm__("");}
+
 __attribute__ ((noinline)) // Make sure this function has its own stack frame
 static enum RIPE_RET
 attack_wrapper(int no_attack) {
     if (no_attack != 0) {
+        empty_func(); // Enforce function call-related instructions
+ancestor_ret:
         DISABLE_PROTECTION();
         printf("Attack succeeded: return_into_ancestor successful.\n");
         longjmp_no_enforce(control_jmp_buffer, RET_ATTACK_SUCCESS);
     }
     jmp_buf stack_jmp_buffer_param;
     func_t *stack_func_ptr_param = dummy_function;
+#ifdef __GNUC__
+    g.ancestor_ret = &&ancestor_ret;
+#endif
     return perform_attack(&stack_func_ptr_param, &stack_jmp_buffer_param);
 }
 
@@ -604,6 +612,11 @@ perform_attack(
             g.jump_target = (void *)((uintptr_t)&rop_target + prologue_length());
             jump_target_name = "&rop_target + PROLOGUE_LENGTH";
             break;
+        case RETURN_INTO_ANCESTOR_ROP:
+            // simulate returning into an "ancestor" function
+            g.jump_target = g.ancestor_ret;
+            jump_target_name = "&attack_wrapper_ret";
+            break;
         case RETURN_INTO_ANCESTOR:
             // simulate invoking an "ancestor" function (with a frame somewhere in the stack trace)
             g.jump_target = (void *)(uintptr_t)&attack_wrapper;
@@ -805,6 +818,7 @@ build_payload(struct payload * payload, ptrdiff_t offset, uint8_t * shellcode, s
         case RETURN_ORIENTED_PROGRAMMING:
         case RETURN_INTO_LIBC:
         case RETURN_INTO_ANCESTOR:
+        case RETURN_INTO_ANCESTOR_ROP:
             if (payload->size < sizeof(long))
                 return false;
             break;
@@ -982,6 +996,13 @@ is_attack_possible()
         return false;
     }
 
+#ifndef __GNUC__
+    if (g.attack.inject_param == RETURN_INTO_ANCESTOR_ROP)
+    {
+        print_reason("Error: Impossible to return into ancestor w/o GNU extensions\n");
+        return false;
+    }
+#endif
 
     if (g.attack.inject_param == DATA_ONLY) {
         if (g.attack.code_ptr != VAR_BOF &&

@@ -13,9 +13,14 @@ __attribute__ ((section (".rodata")))
 const char * const opt_techniques[] = {"direct", "indirect"};
 size_t nr_of_techniques = ARR_ELEMS(opt_techniques);
 
-/* 5 types of injection parameters */
+/* 6 types of injection parameters */
 __attribute__ ((section (".rodata")))
-const char * const opt_inject_params[] = {"shellcode", "returnintolibc", "rop", "return_into_ancestor", "dataonly"};
+const char * const opt_inject_params[] = {"shellcode",
+                                          "returnintolibc",
+                                          "rop",
+                                          "return_into_ancestor",
+                                          "rop_into_ancestor",
+                                          "dataonly"};
 size_t nr_of_inject_params = ARR_ELEMS(opt_inject_params);
 
 /* 13 code pointers to overwrite */
@@ -102,6 +107,8 @@ set_inject_param(char * choice, enum inject_params *i)
     } else if (strcmp(choice, opt_inject_params[3]) == 0) {
         return RETURN_INTO_ANCESTOR;
     } else if (strcmp(choice, opt_inject_params[4]) == 0) {
+        return RETURN_INTO_ANCESTOR_ROP;
+    } else if (strcmp(choice, opt_inject_params[5]) == 0) {
         return DATA_ONLY;
     } else {
         err("Error: Unknown choice of injection parameter \"%s\"\n",
