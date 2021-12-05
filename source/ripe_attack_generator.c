@@ -170,11 +170,11 @@ set_attack_indices(size_t t, size_t i, size_t c, size_t l, size_t f)
 {
     printf("Trying %s/%s/%s/%s/%s\n", opt_techniques[t], opt_inject_params[i], opt_code_ptrs[c], opt_locations[l], opt_funcs[f]);
     dbg("%zu/%zu/%zu/%zu/%zu\n", t, i, c, l, f);
-    g.attack.technique = 100 + t;
-    g.attack.inject_param = 200 + i;
-    g.attack.code_ptr = 300 + c;
-    g.attack.location = 400 + l;
-    g.attack.function = 500 + f;
+    g.attack.technique = t;
+    g.attack.inject_param = i;
+    g.attack.code_ptr = c;
+    g.attack.location = l;
+    g.attack.function = f;
 }
 
 int

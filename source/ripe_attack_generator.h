@@ -32,18 +32,17 @@
 #define PRIxPTR_WIDTH ((int)(sizeof(uintptr_t)*2))
 
 /* Enumerations for typing of attack form parameters                        */
-/* Each enumeration has its own integer space to provide better type safety */
-enum techniques    {DIRECT=100, INDIRECT};
-enum inject_params {INJECTED_CODE_NO_NOP=200, RETURN_INTO_LIBC,
+enum techniques    {DIRECT, INDIRECT};
+enum inject_params {INJECTED_CODE_NO_NOP, RETURN_INTO_LIBC,
                     RETURN_ORIENTED_PROGRAMMING, RETURN_INTO_ANCESTOR, RETURN_INTO_ANCESTOR_ROP, DATA_ONLY};
 
-enum code_ptrs     {RET_ADDR=300, FUNC_PTR_STACK_VAR, FUNC_PTR_STACK_PARAM,
+enum code_ptrs     {RET_ADDR, FUNC_PTR_STACK_VAR, FUNC_PTR_STACK_PARAM,
                     FUNC_PTR_HEAP, FUNC_PTR_BSS, FUNC_PTR_DATA,
                     LONGJMP_BUF_STACK_VAR, LONGJMP_BUF_STACK_PARAM,
                     LONGJMP_BUF_HEAP, LONGJMP_BUF_BSS, LONGJMP_BUF_DATA,
                     VAR_BOF, VAR_LEAK};
-enum locations     {STACK=400, HEAP, BSS, DATA};
-enum functions     {MEMCPY=500, HOMEBREW, SSCANF, STRCPY, STRNCPY, SPRINTF, SNPRINTF,
+enum locations     {STACK, HEAP, BSS, DATA};
+enum functions     {MEMCPY, HOMEBREW, SSCANF, STRCPY, STRNCPY, SPRINTF, SNPRINTF,
                     STRCAT, STRNCAT};
 
 struct attack_form {
