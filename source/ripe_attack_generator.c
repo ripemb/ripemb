@@ -204,11 +204,31 @@ main(int argc, char ** argv)
 #endif
 
 #ifndef RIPE_DEF_ONLY
+#ifdef RIPE_TECHNIQUE
+    size_t t = RIPE_TECHNIQUE; {
+#else
     for (size_t t = 0; t < nr_of_techniques; t++) {
+#endif
+#ifdef RIPE_INJECT
+        size_t i = RIPE_INJECT; {
+#else
         for (size_t i = 0; i < nr_of_inject_params; i++) {
+#endif
+#ifdef RIPE_CODE_PTR
+            size_t c = RIPE_CODE_PTR; {
+#else
             for (size_t c = 0; c < nr_of_code_ptrs; c++) {
+#endif
+#ifdef RIPE_LOCATION
+                size_t l = RIPE_LOCATION; {
+#else
                 for (size_t l = 0; l < nr_of_locations; l++) {
+#endif
+#ifdef RIPE_FUNCTION
+                    size_t f = RIPE_FUNCTION; {
+#else
                     for (size_t f = 0; f < nr_of_funcs; f++) {
+#endif
                         dbg("==========================================================================================\n");
                         set_attack_indices(t, i, c, l, f);
 #else
