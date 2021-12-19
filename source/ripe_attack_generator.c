@@ -168,8 +168,6 @@ err(const char *fmt, ...)
 void
 set_attack_indices(size_t t, size_t i, size_t c, size_t l, size_t f)
 {
-    printf("Trying %s/%s/%s/%s/%s\n", opt_techniques[t], opt_inject_params[i], opt_code_ptrs[c], opt_locations[l], opt_funcs[f]);
-    dbg("%zu/%zu/%zu/%zu/%zu\n", t, i, c, l, f);
     g.attack.technique = t;
     g.attack.inject_param = i;
     g.attack.code_ptr = c;
@@ -232,7 +230,14 @@ main(int argc, char ** argv)
                         dbg("==========================================================================================\n");
                         set_attack_indices(t, i, c, l, f);
 #else
+                        size_t t = g.attack.technique;
+                        size_t i = g.attack.inject_param;
+                        size_t c = g.attack.code_ptr;
+                        size_t l = g.attack.location;
+                        size_t f = g.attack.function;
 #endif
+                        printf("Trying %s/%s/%s/%s/%s\n", opt_techniques[t], opt_inject_params[i], opt_code_ptrs[c], opt_locations[l], opt_funcs[f]);
+                        dbg("%zu/%zu/%zu/%zu/%zu\n", t, i, c, l, f);
                         SETUP_PROTECTION();
                         attack_once();
                         DISABLE_PROTECTION();
