@@ -33,7 +33,7 @@
 
 /* Enumerations for typing of attack form parameters                        */
 enum techniques    {DIRECT, INDIRECT};
-enum inject_params {INJECTED_CODE_NO_NOP, RETURN_INTO_LIBC,
+enum inject_params {INJECTED_CODE_NO_NOP, RETURN_INTO_LIBC, INJECTED_CODE_NO_NOP_JR, RETURN_INTO_LIBC_JR,
                     RETURN_ORIENTED_PROGRAMMING, RETURN_INTO_ANCESTOR, RETURN_INTO_ANCESTOR_ROP, DATA_ONLY};
 
 enum code_ptrs     {RET_ADDR, FUNC_PTR_STACK_VAR, FUNC_PTR_STACK_PARAM,
@@ -181,6 +181,8 @@ void build_shellcode(uint8_t **shellcode, size_t *size_shellcode, func_t *shellc
 // control data destinations
 void
 shellcode_target(void);
+void
+indirect_target(void);
 void
 ret2libc_target(void);
 void

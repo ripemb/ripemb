@@ -121,16 +121,6 @@ struct heap_targets {
     jmp_buf * heap_jmp_buffer;
 };
 
-// control data destinations
-void
-shellcode_target(void);
-void
-ret2libc_target(void);
-void
-rop_target(void);
-void
-dop_target(uint32_t auth);
-
 // arbitrary read bug
 void
 data_leak(uint8_t *buf);
@@ -643,14 +633,21 @@ perform_attack(
     char * overflow_ptr_name;
     switch (g.attack.inject_param) {
         case INJECTED_CODE_NO_NOP:
+        case INJECTED_CODE_NO_NOP_JR:
             g.jump_target = buffer; // shellcode is placed at the beginning of the overflow buffer
             jump_target_name = "buffer (shellcode)";
-            build_shellcode(&shellcode, &size_shellcode, &shellcode_target);
+            build_shellcode(&shellcode, &size_shellcode,
+              (g.attack.inject_param == INJECTED_CODE_NO_NOP ? &shellcode_target : &indirect_target));
             break;
         case RETURN_INTO_LIBC:
             // simulate ret2libc by invoking mock libc function
             g.jump_target = (void *)(uintptr_t)&ret2libc_target;
             jump_target_name = "&ret2libc_target";
+            break;
+        case RETURN_INTO_LIBC_JR:
+            // like RETURN_INTO_LIBC but targeting a function legally called indirectly
+            g.jump_target = (void *)(uintptr_t)&indirect_target;
+            jump_target_name = "&indirect_target";
             break;
         case RETURN_ORIENTED_PROGRAMMING:
             g.jump_target = (void *)((uintptr_t)&rop_target + prologue_length());
@@ -836,6 +833,7 @@ build_payload(struct payload * payload, ptrdiff_t offset, uint8_t * shellcode, s
 
     switch (g.attack.inject_param) {
         case INJECTED_CODE_NO_NOP:
+        case INJECTED_CODE_NO_NOP_JR:
             if (payload->size < (size_shellcode + sizeof(func_t*))) {
                 return false;
             }
@@ -860,6 +858,7 @@ build_payload(struct payload * payload, ptrdiff_t offset, uint8_t * shellcode, s
             } /* else fall through */
         case RETURN_ORIENTED_PROGRAMMING:
         case RETURN_INTO_LIBC:
+        case RETURN_INTO_LIBC_JR:
         case RETURN_INTO_ANCESTOR:
         case RETURN_INTO_ANCESTOR_ROP:
             if (payload->size < sizeof(long))
@@ -969,6 +968,15 @@ ret2libc_target()
 }
 
 void
+indirect_target()
+{
+    JUST_SOME_INSTRUCTIONS();
+    DISABLE_PROTECTION();
+    printf("Attack succeeded: indirect_target() reached.\n");
+    longjmp_no_enforce(control_jmp_buffer, RET_ATTACK_SUCCESS);
+}
+
+void
 dop_target(uint32_t auth)
 {
     JUST_SOME_INSTRUCTIONS();
@@ -1036,7 +1044,8 @@ data_leak(uint8_t *buf) {
 char *
 is_attack_possible()
 {
-    if ((g.attack.inject_param == INJECTED_CODE_NO_NOP) &&
+    if (((g.attack.inject_param == INJECTED_CODE_NO_NOP) ||
+         (g.attack.inject_param == INJECTED_CODE_NO_NOP_JR)) &&
       (!(g.attack.function == MEMCPY) && !(g.attack.function == HOMEBREW)))
     {
         return "Error: Impossible to inject shellcode with string functions (for now)";
