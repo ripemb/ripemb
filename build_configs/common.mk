@@ -26,3 +26,4 @@ CFLAGS += -DRIPE_FUNCTION=MEMCPY
 RIPE_SOURCES += $(SOURCE_DIR)/ripe_cli.c
 RIPE_SOURCES += $(SOURCE_DIR)/ripe_attack_generator.c
 
+RIPE_SOURCES += $(SOURCE_DIR)/main.c

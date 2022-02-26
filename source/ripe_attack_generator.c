@@ -164,7 +164,7 @@ set_attack_indices(size_t t, size_t i, size_t c, size_t l, size_t f)
 }
 
 int
-main(int argc, char ** argv)
+ripe(int argc, char ** argv)
 {
     save_heap(g.heap_safe);
 

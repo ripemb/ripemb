@@ -130,6 +130,8 @@ enum RIPE_RET {
 
 extern struct ripe_globals g;
 
+int ripe(int argc, char ** argv);
+
 /* Print out only if output_debug_info is set */
 void dbg(const char *fmt, ...) __attribute__((format(__printf__, 1, 2)));
 void err(const char *fmt, ...) __attribute__((format(__printf__, 1, 2)));
