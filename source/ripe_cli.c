@@ -187,8 +187,10 @@ set_function(char * choice, enum functions *f)
         *f = MEMCPY;
     } else if (strcmp(choice, opt_funcs[1]) == 0) {
         *f = HOMEBREW;
+#ifndef RIPE_NO_SCANF
     } else if (strcmp(choice, opt_funcs[2]) == 0) {
         *f = SSCANF;
+#endif
     } else if (strcmp(choice, opt_funcs[3]) == 0) {
         *f = STRCPY;
     } else if (strcmp(choice, opt_funcs[4]) == 0) {

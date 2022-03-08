@@ -724,12 +724,14 @@ perform_attack(
         case HOMEBREW:
             homebrew_memcpy(buffer, g.payload.buffer, g.payload.size - 1);
             break;
+#ifndef RIPE_NO_SCANF
         case SSCANF: {
             char fmt[sizeof(g.payload.size)*4+3];
             snprintf(fmt, sizeof(fmt)-1, "%%%zuc", g.payload.size);
             attack_ret = sscanf(g.payload.buffer, fmt, buffer);
             break;
         }
+#endif
         case STRCPY:
             attack_ret = (uintptr_t)strcpy((char *)buffer, g.payload.buffer);
             break;
