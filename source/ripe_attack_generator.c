@@ -36,6 +36,11 @@
 #endif
 #define JUST_SOME_INSTRUCTIONS() for(volatile int _i=0;_i<3;_i++)
 
+// Some architectures require additional bits set on the branch target address (e.g., ARM Thumb)
+#ifndef RIPE_BRANCH_OR_MASK
+    #define RIPE_BRANCH_OR_MASK 0
+#endif
+
 static void attack_once(void);
 static enum RIPE_RET attack_wrapper(int no_attack);
 static enum RIPE_RET perform_attack(func_t **stack_func_ptr_param,
@@ -684,7 +689,7 @@ perform_attack(
     }
     switch (g.attack.technique) {
         case DIRECT:
-            g.payload.overflow_ptr = g.jump_target;
+            g.payload.overflow_ptr = (void *)((uintptr_t)g.jump_target | RIPE_BRANCH_OR_MASK);
             overflow_ptr_name = jump_target_name;
             break;
         case INDIRECT:
@@ -770,7 +775,7 @@ perform_attack(
      * Overwrite code pointer for indirect attacks *
      ***********************************************/
     if (g.attack.technique == INDIRECT) {
-        *(uintptr_t *) *(uintptr_t *) g.of_target = (uintptr_t)g.jump_target;
+        *(uintptr_t *) *(uintptr_t *) g.of_target = (uintptr_t)g.jump_target | RIPE_BRANCH_OR_MASK;
     }
 
     switch (g.attack.code_ptr) {
