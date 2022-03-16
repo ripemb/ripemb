@@ -139,10 +139,9 @@ data_leak(uint8_t *buf);
 void
 lj_func(jmp_buf lj_buf);
 
-// get ret address
-// ra written to stack one word higher than bp
-#define OLD_BP_PTR   __builtin_frame_address(0)
-#define RET_ADDR_PTR ((uintptr_t *) OLD_BP_PTR - 1)
+#ifndef RIPE_SET_RET_ADDR_PTR
+    #error RIPE_SET_RET_ADDR_PTR undefined, needed to determine address on the stack where the return address is saved.
+#endif
 
 void
 dbg(const char *fmt, ...)
@@ -359,6 +358,9 @@ perform_attack(
     func_t ** stack_func_ptr_param,
     jmp_buf *stack_jmp_buffer_param)
 {
+    void * ret_addr_ptr;
+    RIPE_SET_RET_ADDR_PTR(ret_addr_ptr);
+
     /* STACK TARGETS
         Overflow buffer
         DOP flag
@@ -481,8 +483,8 @@ perform_attack(
     // Set Target Address
     switch (g.attack.code_ptr) {
         case RET_ADDR:
-            target_addr = RET_ADDR_PTR;
-            target_name = "RET_ADDR_PTR";
+            target_addr = ret_addr_ptr;
+            target_name = "ret_addr_ptr";
             break;
         case FUNC_PTR_STACK_VAR:
             target_addr = &stack.stack_func_ptr;
