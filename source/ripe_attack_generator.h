@@ -176,7 +176,7 @@ bool set_function(char *choice, enum functions *f);
 char *is_attack_possible(void);
 void homebrew_memcpy(void *dst, const void *src, size_t len);
 
-void build_shellcode(uint8_t **shellcode, size_t *size_shellcode);
+void build_shellcode(uint8_t **shellcode, size_t *size_shellcode, func_t *shellcode_target);
 
 // control data destinations
 void

@@ -45,7 +45,7 @@ The shellcode is formatted so that:
   2. Byte order is converted to little-endian
 */
 void
-build_shellcode(uint8_t **shellcode, size_t *size_shellcode)
+build_shellcode(uint8_t **shellcode, size_t *size_shellcode, func_t *shellcode_target)
 {
     static uint8_t shellcode_nonop[3*sizeof(uint32_t)
         #ifdef PREPEND_SHELLCODE
@@ -60,10 +60,10 @@ build_shellcode(uint8_t **shellcode, size_t *size_shellcode)
 
     char attack_addr[9], low_bits[4], high_bits[6];  // target address and its components
     // fix shellcode when lower bits would become negative
-    if (((uintptr_t)&shellcode_target & 0x00000fff) >= 0x800)
-        hex_to_string(attack_addr, (uintptr_t)&shellcode_target + 0x1000);
+    if (((uintptr_t)shellcode_target & 0x00000fff) >= 0x800)
+        hex_to_string(attack_addr, (uintptr_t)shellcode_target + 0x1000);
     else
-        hex_to_string(attack_addr, (uintptr_t)&shellcode_target);
+        hex_to_string(attack_addr, (uintptr_t)shellcode_target);
 
     // split attack address into low and high bit strings
     strncpy(low_bits, &attack_addr[5], 3);

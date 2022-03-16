@@ -645,7 +645,7 @@ perform_attack(
         case INJECTED_CODE_NO_NOP:
             g.jump_target = buffer; // shellcode is placed at the beginning of the overflow buffer
             jump_target_name = "buffer (shellcode)";
-            build_shellcode(&shellcode, &size_shellcode);
+            build_shellcode(&shellcode, &size_shellcode, &shellcode_target);
             break;
         case RETURN_INTO_LIBC:
             // simulate ret2libc by invoking mock libc function
