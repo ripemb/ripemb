@@ -140,3 +140,18 @@ format_instruction(uint8_t * dest, size_t insn)
         dest[3 - i] = insn_bytes[i];
     }
 }
+
+// For RETURN_ORIENTED_PROGRAMMING we skip over the prologue code of
+// rop_target() to simulate return-oriented programming gadget
+#ifndef PROLOGUE_OFF
+  #define PROLOGUE_OFF 0
+#endif
+#ifdef __riscv_compressed
+  #define PROLOGUE_LENGTH (8+PROLOGUE_OFF)
+#else
+  #define PROLOGUE_LENGTH (16+PROLOGUE_OFF)
+#endif
+
+size_t prologue_length (void) {
+  return PROLOGUE_LENGTH;
+}

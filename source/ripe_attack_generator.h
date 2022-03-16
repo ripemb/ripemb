@@ -95,6 +95,8 @@ extern size_t nr_of_funcs;
 void save_heap(uint8_t *heap_safe);
 /* Restore the heap area from the snapshot saved in heap_safe. */
 void restore_heap(uint8_t *heap_safe);
+/* Define how much we skip over the prologue code of rop_target() to simulate RETURN_ORIENTED_PROGRAMMING. */
+size_t prologue_length (void);
 
 /* To keep mandatory control variables out of harm, we need to make sure their
  * addresses are safe, i.e. are not between overflown buffers and their targets.

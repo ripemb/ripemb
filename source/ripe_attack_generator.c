@@ -25,17 +25,6 @@
     #define RIPE_DEF_FUNCTION MEMCPY
 #endif
 
-// For RETURN_ORIENTED_PROGRAMMING we skip over the prologue code of
-// rop_target() to simulate return-oriented programming gadget
-#ifndef PROLOGUE_OFF
-  #define PROLOGUE_OFF 0
-#endif
-#ifdef __riscv_compressed
-  #define PROLOGUE_LENGTH (8+PROLOGUE_OFF)
-#else
-  #define PROLOGUE_LENGTH (16+PROLOGUE_OFF)
-#endif
-
 #define SECRET_STRING_START "Secret data "
 #define MAX_SECRET_LEN (32)
 #define BUF_LEN (256)
@@ -587,7 +576,7 @@ perform_attack(
             jump_target_name = "&ret2libc_target";
             break;
         case RETURN_ORIENTED_PROGRAMMING:
-            g.jump_target = (void *)((uintptr_t)&rop_target + PROLOGUE_LENGTH);
+            g.jump_target = (void *)((uintptr_t)&rop_target + prologue_length());
             jump_target_name = "&rop_target + PROLOGUE_LENGTH";
             break;
         case RETURN_INTO_ANCESTOR:
