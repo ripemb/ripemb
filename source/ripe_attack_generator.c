@@ -410,11 +410,6 @@ perform_attack(
     void * target_addr;
     char * target_name;
 
-    // write shellcode with correct jump address
-    uint8_t *shellcode = NULL;
-    size_t size_shellcode = 0;
-    build_shellcode(&shellcode, &size_shellcode);
-
     switch (g.attack.location) {
         case STACK:
             buffer = stack.stack_buffer;
@@ -640,12 +635,17 @@ perform_attack(
             break;
     }
 
+    // write shellcode with correct jump target address
+    uint8_t *shellcode = NULL;
+    size_t size_shellcode = 0;
+
     char * jump_target_name;
     char * overflow_ptr_name;
     switch (g.attack.inject_param) {
         case INJECTED_CODE_NO_NOP:
             g.jump_target = buffer; // shellcode is placed at the beginning of the overflow buffer
             jump_target_name = "buffer (shellcode)";
+            build_shellcode(&shellcode, &size_shellcode);
             break;
         case RETURN_INTO_LIBC:
             // simulate ret2libc by invoking mock libc function
