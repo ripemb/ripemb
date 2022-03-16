@@ -46,6 +46,14 @@ struct ripe_globals g = {
     .output_debug_info = true,
     .output_reasons = false,
 };
+
+#ifndef RIPE_JMPBUF_TYPE
+    #define RIPE_JMPBUF_TYPE int
+#endif
+#ifndef RIPE_JMPBUF_IDX
+    #define RIPE_JMPBUF_IDX 0
+#endif
+
 jmp_buf control_jmp_buffer; // We use long jmp to get back from attacks.
 
 static struct {
@@ -493,23 +501,23 @@ perform_attack(
             target_name = "&d.data_func_ptr";
             break;
         case LONGJMP_BUF_STACK_VAR:
-            target_addr = stack.stack_jmp_buffer;
+            target_addr = &(((RIPE_JMPBUF_TYPE *)stack.stack_jmp_buffer)[RIPE_JMPBUF_IDX]);
             target_name = "stack.stack_jmp_buffer";
             break;
         case LONGJMP_BUF_STACK_PARAM:
-            target_addr = stack_jmp_buffer_param;
+            target_addr = &(((RIPE_JMPBUF_TYPE *)stack_jmp_buffer_param)[RIPE_JMPBUF_IDX]);
             target_name = "stack_jmp_buffer_param";
             break;
         case LONGJMP_BUF_HEAP:
-            target_addr = heap->heap_jmp_buffer;
+            target_addr = &(((RIPE_JMPBUF_TYPE *)heap->heap_jmp_buffer)[RIPE_JMPBUF_IDX]);
             target_name = "heap->heap_jmp_buffer";
             break;
         case LONGJMP_BUF_DATA:
-            target_addr = d.data_jmp_buffer;
+            target_addr = &(((RIPE_JMPBUF_TYPE *)d.data_jmp_buffer)[RIPE_JMPBUF_IDX]);
             target_name = "d.data_jmp_buffer";
             break;
         case LONGJMP_BUF_BSS:
-            target_addr = b.bss_jmp_buffer;
+            target_addr = &(((RIPE_JMPBUF_TYPE *)b.bss_jmp_buffer)[RIPE_JMPBUF_IDX]);
             target_name = "b.bss_jmp_buffer";
             break;
         case VAR_BOF:

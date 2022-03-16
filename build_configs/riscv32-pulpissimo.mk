@@ -4,6 +4,7 @@ PULP_APP_SRCS := $(RIPE_SOURCES) \
                  $(SOURCE_DIR)/riscv32-pulpissimo.c
 
 PULP_APP_ASM_SRCS := $(SOURCE_DIR)/riscv32_longjmp_no_enforce.S
+PULP_CFLAGS += -DRIPE_JMPBUF_TYPE=long
 
 PULP_CFLAGS += $(CFLAGS)
 PULP_CFLAGS += -D PULP_HZ=16000000
