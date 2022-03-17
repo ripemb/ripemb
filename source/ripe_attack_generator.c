@@ -929,7 +929,7 @@ build_payload(struct payload * payload, ptrdiff_t offset, uint8_t * shellcode, s
     }
 
     /* Finally, add the terminating null character at the end */
-    memset((payload->buffer + payload->size - 1), '\0', 1);
+    payload->buffer[payload->size - 1] = '\0';
     
     if (g.output_debug_info) {
         dbg("payload of %zu bytes created.\n", payload->size);
