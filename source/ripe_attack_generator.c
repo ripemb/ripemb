@@ -295,6 +295,7 @@ attack_once(void) {
         SETUP_PROTECTION();
         enum RIPE_RET ret = attack_wrapper(0);
         DISABLE_PROTECTION();
+        restore_heap(g.heap_safe);
         dbg("attack_wrapper() returned %d (", ret);
         switch (ret) {
             case RET_ATTACK_FAIL: g.failed++; dbg("attack failed)\n"); break;
@@ -304,6 +305,7 @@ attack_once(void) {
         }
     } else {
         DISABLE_PROTECTION();
+        restore_heap(g.heap_safe);
         if (sj != RET_ATTACK_SUCCESS)
             dbg("setjmp() returned via longjmp %d (", sj);
         switch (sj) {
