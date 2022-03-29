@@ -478,6 +478,11 @@ perform_attack(
             }
             // Also set the location of the function pointer on the heap
             break;
+        default:
+            if (g.output_debug_info) {
+                err("Unknown choice of attack location");
+            }
+            return RET_ERR;
     }
 
     // Set Target Address
@@ -567,6 +572,11 @@ perform_attack(
                     break;
             }
             break;
+        default:
+            if (g.output_debug_info) {
+                err("Unknown choice of code pointer");
+            }
+            return RET_ERR;
     }
 
     char * of_target_name; // Name of initial overflow target
@@ -595,6 +605,11 @@ perform_attack(
                     break;
             }
             break;
+        default:
+            if (g.output_debug_info) {
+                err("Unknown choice of technique");
+            }
+            return RET_ERR;
     }
 
     // set longjmp buffers
@@ -686,8 +701,8 @@ perform_attack(
         default:
             if (g.output_debug_info) {
                 err("Unknown choice of attack code");
-                return RET_ERR;
             }
+            return RET_ERR;
     }
     switch (g.attack.technique) {
         case DIRECT:
