@@ -426,26 +426,29 @@ perform_attack(
             }
 
             break;
-        case HEAP:
+        case HEAP: {
             /* Injection into heap buffer                            */
 
-            if ((uintptr_t) heap->heap_buffer1 < (uintptr_t) heap->heap_buffer2)
-            {
-                dbg("heap buffers: 0x%0*" PRIxPTR ", 0x%0*" PRIxPTR ".\n",
-                    PRIxPTR_WIDTH, (uintptr_t)heap->heap_buffer1,
-                    PRIxPTR_WIDTH, (uintptr_t)heap->heap_buffer2);
-                buffer = heap->heap_buffer1;
+            uint8_t *low, *high;
+            if ((uintptr_t) heap->heap_buffer1 < (uintptr_t) heap->heap_buffer2) {
+                low = heap->heap_buffer1;
+                high = heap->heap_buffer2;
                 buf_name = "heap->heap_buffer1";
-                // Set the location of the memory pointer on the heap
-                heap->heap_mem_ptr     = heap->heap_buffer2;
-
-                if (g.attack.code_ptr == VAR_LEAK) {
-                    heap->heap_secret = (char *)heap->heap_buffer2;
-                    strcpy(heap->heap_secret, SECRET_STRING_START "HEAP");
-                }
             } else {
-                err("Error: Heap buffers allocated in the wrong order.\n");
-                return RET_ERR;
+                low = heap->heap_buffer2;
+                high = heap->heap_buffer1;
+                buf_name = "heap->heap_buffer2";
+            }
+            dbg("heap buffers: 0x%0*" PRIxPTR ", 0x%0*" PRIxPTR ".\n",
+                PRIxPTR_WIDTH, (uintptr_t)low,
+                PRIxPTR_WIDTH, (uintptr_t)high);
+            buffer = low;
+            // Set the location of the memory pointer on the heap
+            heap->heap_mem_ptr = high;
+
+            if (g.attack.code_ptr == VAR_LEAK) {
+                heap->heap_secret = (char *)high;
+                strcpy(heap->heap_secret, SECRET_STRING_START "HEAP");
             }
 
             // set up heap ptr with DOP target
@@ -453,6 +456,7 @@ perform_attack(
                 heap->heap_mem_ptr = (uint8_t *)heap->heap_flag;
             }
             break;
+        }
         case DATA:
             /* Injection into data segment buffer                    */
 
