@@ -25,18 +25,32 @@ int main(void) {
   while(1);
 }
 
+/* lj_from_handler is a simple assembly routine that works around ARM's
+ * peculiar requirements for returning from exceptions.
+ * It manipulates the stack and then returns from the exception effectively
+ * calling longjmp_no_enforce(). */
+__attribute__ ((noreturn)) void lj_from_handler(uint32_t);
+
 /* Faults due to MPU violations. */
 __attribute__ ((noreturn))
-void mem_manage_handler(void) {while (1);}
+void mem_manage_handler(void) {
+  lj_from_handler(RET_ATTACK_FAIL_ILLEGAL_INSTR);
+}
 
 /* Undefined instructions, illegal unaligned access, invalid execution states etc. */
 __attribute__ ((noreturn))
-void usage_fault_handler(void) {while (1);}
+void usage_fault_handler(void) {
+  lj_from_handler(RET_ATTACK_FAIL_ILLEGAL_INSTR);
+}
 
 /* Mostly escalated exceptions, e.g., if an exception handler causes an exception. */
 __attribute__ ((noreturn))
-void hard_fault_handler(void){while (1);}
+void hard_fault_handler(void){
+  lj_from_handler(RET_ATTACK_FAIL_ILLEGAL_INSTR);
+}
 
 /* Faults related to bus/memory accesses. */
 __attribute__ ((noreturn))
-void bus_fault_handler(void){while (1);}
+void bus_fault_handler(void){
+  lj_from_handler(RET_ATTACK_FAIL_ILLEGAL_INSTR);
+}

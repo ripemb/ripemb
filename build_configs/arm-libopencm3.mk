@@ -59,12 +59,13 @@ LDFLAGS += -nostartfiles
 
 CFILES += $(SOURCE_DIR)/libc-newlib.c
 CFILES += $(RIPE_SOURCES) $(SOURCE_DIR)/arm-opencm3.c
+ASFILES += $(SOURCE_DIR)/arm-opencm3-asm.S
 
 LIBOPENCM3_LIB_GEN = $(OPENCM3_DIR)/lib/libopencm3_$(subst /,,$(t)).a
 LIBOPENCM3_LIBS := $(foreach t,$(LIBOPENCM3_CUR),$(call LIBOPENCM3_LIB_GEN,$(t)))
 LIBOPENCM3_LIBS_ALL := $(foreach t,$(LIBOPENCM3_ALL),$(call LIBOPENCM3_LIB_GEN,$(t)))
 
-OBJS = $(CFILES:%.c=%.o)
+OBJS = $(CFILES:%.c=%.o) $(ASFILES:%.S=%.o)
 .PRECIOUS: $(OBJS)
 
 .DEFAULT_GOAL := all
@@ -125,3 +126,8 @@ tty:
 
 include $(OPENCM3_DIR)/mk/genlink-rules.mk
 include $(OPENCM3_DIR)/mk/gcc-rules.mk
+
+# libopencm3 does not provide rules for .S
+%.o: %.S
+	@printf "  AS      $(*).S\n"
+	$(Q)$(AS) $(ASFLAGS) $(ARCH_FLAGS) -o $@ $<
