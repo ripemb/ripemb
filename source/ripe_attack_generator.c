@@ -652,7 +652,6 @@ perform_attack(
         dbg("jump_target (%s) == %p\n", jump_target_name, g.jump_target);
         dbg("overflow_ptr (%s) == %p\n", overflow_ptr_name, g.payload.overflow_ptr);
     }
-    g.prev_target = *(uintptr_t *)g.of_target;
     ptrdiff_t target_offset = (uintptr_t)g.of_target - (uintptr_t)buffer;
     if (target_offset < 0) {
         if (g.output_debug_info)
