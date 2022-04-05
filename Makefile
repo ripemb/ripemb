@@ -20,3 +20,7 @@ ripe_attack_generator: ./source/ripe_attack_generator.c
 	mkdir -p build/ out/
 	$(CC) \
 		$^ $(CFLAGS) -o ./build/ripe_attack_generator
+
+# Disable implicit suffix and built-in rules (for performance and profit)
+.SUFFIXES:
+MAKEFLAGS += --no-builtin-rules
