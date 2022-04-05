@@ -24,3 +24,7 @@ ripe_attack_generator: ./source/ripe_attack_generator.c
 # Disable implicit suffix and built-in rules (for performance and profit)
 .SUFFIXES:
 MAKEFLAGS += --no-builtin-rules
+
+.PRECIOUS: %/
+%/:
+	@mkdir -p $@
