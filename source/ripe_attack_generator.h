@@ -102,6 +102,7 @@ size_t prologue_length (void);
  * This is only possible in C by stuffing everything in structs... */
 extern struct ripe_globals {
     bool output_debug_info;
+    bool output_reasons;
     unsigned int possible;
     unsigned int impossible;
     unsigned int rtimpossible;
@@ -172,7 +173,7 @@ bool set_location(char *choice, enum locations *l);
 bool set_function(char *choice, enum functions *f);
 
 
-bool is_attack_possible(void);
+char *is_attack_possible(void);
 void homebrew_memcpy(void *dst, const void *src, size_t len);
 
 void build_shellcode(uint8_t **shellcode, size_t *size_shellcode);

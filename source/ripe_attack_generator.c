@@ -8,8 +8,6 @@
 
 #include "ripe_attack_generator.h"
 
-#define print_reason(s) // fprintf(stderr, s)
-
 #ifndef RIPE_DEF_TECHNIQUE
     #define RIPE_DEF_TECHNIQUE DIRECT
 #endif
@@ -46,6 +44,7 @@ static void dummy_function(void);
 
 struct ripe_globals g = {
     .output_debug_info = true,
+    .output_reasons = false,
 };
 jmp_buf control_jmp_buffer; // We use long jmp to get back from attacks.
 
@@ -227,17 +226,14 @@ main(int argc, char ** argv)
 #else
                     for (size_t f = 0; f < nr_of_funcs; f++) {
 #endif
-                        dbg("==========================================================================================\n");
                         set_attack_indices(t, i, c, l, f);
 #else
-                        size_t t = g.attack.technique;
-                        size_t i = g.attack.inject_param;
-                        size_t c = g.attack.code_ptr;
-                        size_t l = g.attack.location;
-                        size_t f = g.attack.function;
+                        set_attack_indices(g.attack.technique,
+                                           g.attack.inject_param,
+                                           g.attack.code_ptr,
+                                           g.attack.location,
+                                           g.attack.function);
 #endif
-                        printf("Trying %s/%s/%s/%s/%s\n", opt_techniques[t], opt_inject_params[i], opt_code_ptrs[c], opt_locations[l], opt_funcs[f]);
-                        dbg("%zu/%zu/%zu/%zu/%zu\n", t, i, c, l, f);
                         SETUP_PROTECTION();
                         attack_once();
                         DISABLE_PROTECTION();
@@ -267,11 +263,29 @@ longjmp_no_enforce (jmp_buf jb, int rv) {
 }
 
 static void
+print_attack_header (void) {
+    size_t t = g.attack.technique;
+    size_t i = g.attack.inject_param;
+    size_t c = g.attack.code_ptr;
+    size_t l = g.attack.location;
+    size_t f = g.attack.function;
+    dbg("==========================================================================================\n");
+    printf("Trying %s/%s/%s/%s/%s\n", opt_techniques[t], opt_inject_params[i], opt_code_ptrs[c], opt_locations[l], opt_funcs[f]);
+    dbg("%zu/%zu/%zu/%zu/%zu\n", t, i, c, l, f);
+}
+
+static void
 attack_once(void) {
-    if (!is_attack_possible()) {
+    char *reason;
+    if ((reason = is_attack_possible()) != NULL) {
+        if (g.output_reasons) {
+            print_attack_header();
+            fprintf(stderr, "%s\n", reason);
+        }
         g.impossible++;
         return;
     }
+    print_attack_header();
     g.possible++;
     init_d();
     int sj = setjmp(control_jmp_buffer);
@@ -1017,21 +1031,19 @@ data_leak(uint8_t *buf) {
     dbg("msg does not match secret string\n");
 }
 
-bool
+char *
 is_attack_possible()
 {
     if ((g.attack.inject_param == INJECTED_CODE_NO_NOP) &&
       (!(g.attack.function == MEMCPY) && !(g.attack.function == HOMEBREW)))
     {
-        print_reason("Error: Impossible to inject shellcode with string functions (for now)\n");
-        return false;
+        return "Error: Impossible to inject shellcode with string functions (for now)";
     }
 
 #ifndef __GNUC__
     if (g.attack.inject_param == RETURN_INTO_ANCESTOR_ROP)
     {
-        print_reason("Error: Impossible to return into ancestor w/o GNU extensions\n");
-        return false;
+        return "Error: Impossible to return into ancestor w/o GNU extensions";
     }
 #endif
 
@@ -1039,18 +1051,15 @@ is_attack_possible()
         if (g.attack.code_ptr != VAR_BOF &&
             g.attack.code_ptr != VAR_LEAK)
         {
-            print_reason("Error: Misused DOP code pointer parameters.\n");
-            return false;
+            return "Error: Misused DOP code pointer parameters.";
         }
 
         if (g.attack.code_ptr == VAR_LEAK && g.attack.technique == INDIRECT) {
-            print_reason("Error: Impossible to do an indirect leak attack.\n");
-            return false;
+            return "Error: Impossible to do an indirect leak attack.";
         }
     } else if (g.attack.code_ptr == VAR_BOF ||
                g.attack.code_ptr == VAR_LEAK) {
-        print_reason("Error: Must use \"dataonly\" injection parameter for DOP attacks.\n");
-        return false;
+        return "Error: Must use \"dataonly\" injection parameter for DOP attacks.";
     }
 
     // attacks targeting another memory location must be indirect
@@ -1064,8 +1073,7 @@ is_attack_possible()
                   (g.attack.code_ptr == LONGJMP_BUF_DATA) ||
                   (g.attack.code_ptr == LONGJMP_BUF_BSS) )
                 {
-                    print_reason("Error: Impossible to perform a direct attack on the stack into another memory segment.\n");
-                    return false;
+                    return "Error: Impossible to perform a direct attack on the stack into another memory segment.";
                 }
             }
             break;
@@ -1082,8 +1090,7 @@ is_attack_possible()
               (g.attack.code_ptr == LONGJMP_BUF_BSS) ||
               (g.attack.code_ptr == LONGJMP_BUF_DATA) ))
             {
-                print_reason("Error: Impossible to perform a direct attack on the heap into another memory segment.\n");
-                return false;
+                return "Error: Impossible to perform a direct attack on the heap into another memory segment.";
             }
             break;
 
@@ -1099,8 +1106,7 @@ is_attack_possible()
               (g.attack.code_ptr == LONGJMP_BUF_HEAP) ||
               (g.attack.code_ptr == LONGJMP_BUF_BSS) ))
             {
-                print_reason("Error: Impossible to perform a direct attack on the data segment into another memory segment.\n");
-                return false;
+                return "Error: Impossible to perform a direct attack on the data segment into another memory segment.";
             }
             break;
 
@@ -1116,11 +1122,10 @@ is_attack_possible()
               (g.attack.code_ptr == LONGJMP_BUF_HEAP) ||
               (g.attack.code_ptr == LONGJMP_BUF_DATA) ))
             {
-                print_reason("Error: Impossible to perform a direct attack on the bss into another memory segment.\n");
-                return false;
+                return "Error: Impossible to perform a direct attack on the bss into another memory segment.";
             }
             break;
     }
 
-    return true;
+    return NULL;
 } /* is_attack_possible */
