@@ -2,6 +2,15 @@ RIPEMB_DIR:=$(dir $(abspath $(lastword $(MAKEFILE_LIST))))/build_configs/../
 SOURCE_DIR:=$(RIPEMB_DIR)/source/
 BUILD_CONFIG_DIR:=$(RIPEMB_DIR)/build_configs/
 
+# If a board name is given and no CC has been set, we set a sensible default.
+ifneq ($(BOARD),)
+  ifeq ($(origin CC),default)
+    ifneq ($(filter $(BOARD),NUCLEO DISCOVERY TIVAC),)
+      CC = arm-none-eabi-gcc
+    endif
+  endif
+endif
+
 # Set compiler if need be:
 # default to riscv32 but allow it to be overridden too
 ifeq ($(origin CC),default)
