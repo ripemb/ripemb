@@ -48,7 +48,7 @@ static enum RIPE_RET perform_attack(func_t **stack_func_ptr_param,
 static void dummy_function(void);
 
 struct ripe_globals g = {
-    .output_debug_info = true,
+    .output_level = 1,
     .output_reasons = false,
 };
 
@@ -147,13 +147,24 @@ lj_func(jmp_buf lj_buf);
 #endif
 
 void
-dbg(const char *fmt, ...)
+info(const char *fmt, ...)
 {
-    if (!g.output_debug_info)
+    if (g.output_level < 1)
         return;
     va_list ap;
     va_start(ap, fmt);
-    vfprintf(stderr, fmt, ap);
+    vfprintf(stdout, fmt, ap);
+    va_end(ap);
+}
+
+void
+dbg(const char *fmt, ...)
+{
+    if (g.output_level < 2)
+        return;
+    va_list ap;
+    va_start(ap, fmt);
+    vfprintf(stdout, fmt, ap);
     va_end(ap);
 }
 
@@ -189,7 +200,7 @@ ripe(int argc, char ** argv)
     g.attack.function = RIPE_DEF_FUNCTION;
 
 #ifndef RIPE_NO_CLI
-    if (parse_ripe_params(argc, argv, &g.attack, &g.output_debug_info) != 0) {
+    if (parse_ripe_params(argc, argv, &g.attack, &g.output_level) != 0) {
         err("Could not parse command line arguments\n");
         return 1;
     }
@@ -272,7 +283,7 @@ print_attack_header (void) {
     size_t l = g.attack.location;
     size_t f = g.attack.function;
     dbg("==========================================================================================\n");
-    printf("Trying %s/%s/%s/%s/%s\n", opt_techniques[t], opt_inject_params[i], opt_code_ptrs[c], opt_locations[l], opt_funcs[f]);
+    info("Trying %s/%s/%s/%s/%s\n", opt_techniques[t], opt_inject_params[i], opt_code_ptrs[c], opt_locations[l], opt_funcs[f]);
     dbg("%zu/%zu/%zu/%zu/%zu\n", t, i, c, l, f);
 }
 
@@ -282,7 +293,7 @@ attack_once(void) {
     if ((reason = is_attack_possible()) != NULL) {
         if (g.output_reasons) {
             print_attack_header();
-            fprintf(stderr, "%s\n", reason);
+            err("%s\n", reason);
         }
         g.impossible++;
         return;
@@ -344,7 +355,7 @@ attack_wrapper(int no_attack) {
 ancestor_ret:
         JUST_SOME_INSTRUCTIONS();
         DISABLE_PROTECTION();
-        printf("Attack succeeded: return_into_ancestor successful.\n");
+        info("Attack succeeded: return_into_ancestor successful.\n");
         longjmp_no_enforce(control_jmp_buffer, RET_ATTACK_SUCCESS);
     }
     jmp_buf stack_jmp_buffer_param;
@@ -483,9 +494,7 @@ perform_attack(
             // Also set the location of the function pointer on the heap
             break;
         default:
-            if (g.output_debug_info) {
-                err("Unknown choice of attack location");
-            }
+            err("Unknown choice of attack location");
             return RET_ERR;
     }
 
@@ -577,9 +586,7 @@ perform_attack(
             }
             break;
         default:
-            if (g.output_debug_info) {
-                err("Unknown choice of code pointer");
-            }
+            err("Unknown choice of code pointer");
             return RET_ERR;
     }
 
@@ -610,9 +617,7 @@ perform_attack(
             }
             break;
         default:
-            if (g.output_debug_info) {
-                err("Unknown choice of technique");
-            }
+            err("Unknown choice of technique");
             return RET_ERR;
     }
 
@@ -623,35 +628,35 @@ perform_attack(
                 DISABLE_PROTECTION();
                 /* setjmp() returns 0 if returning directly and non-zero when returning */
                 /* from longjmp() using the saved context. Attack failed.               */
-                printf("Longjmp attack failed. Returning normally...\n");
+                info("Longjmp attack failed. Returning normally...\n");
                 return RET_ATTACK_FAIL;
             }
             break;
         case LONGJMP_BUF_STACK_PARAM:
             if (setjmp(*stack_jmp_buffer_param) != 0) {
                 DISABLE_PROTECTION();
-                printf("Longjmp attack failed. Returning normally...\n");
+                info("Longjmp attack failed. Returning normally...\n");
                 return RET_ATTACK_FAIL;
             }
             break;
         case LONGJMP_BUF_HEAP:
             if (setjmp(*heap->heap_jmp_buffer) != 0) {
                 DISABLE_PROTECTION();
-                printf("Longjmp attack failed. Returning normally...\n");
+                info("Longjmp attack failed. Returning normally...\n");
                 return RET_ATTACK_FAIL;
             }
             break;
         case LONGJMP_BUF_DATA:
             if (setjmp(d.data_jmp_buffer) != 0) {
                 DISABLE_PROTECTION();
-                printf("Longjmp attack failed. Returning normally...\n");
+                info("Longjmp attack failed. Returning normally...\n");
                 return RET_ATTACK_FAIL;
             }
             break;
         case LONGJMP_BUF_BSS:
             if (setjmp(b.bss_jmp_buffer) != 0) {
                 DISABLE_PROTECTION();
-                printf("Longjmp attack failed. Returning normally...\n");
+                info("Longjmp attack failed. Returning normally...\n");
                 return RET_ATTACK_FAIL;
             }
             break;
@@ -703,9 +708,7 @@ perform_attack(
             jump_target_name = "0xdeadc0de";
             break;
         default:
-            if (g.output_debug_info) {
-                err("Unknown choice of attack code");
-            }
+            err("Unknown choice of attack code");
             return RET_ERR;
     }
     switch (g.attack.technique) {
@@ -718,17 +721,14 @@ perform_attack(
             overflow_ptr_name = target_name;
             break;
     }
-    if (g.output_debug_info) {
-        dbg("buffer (%s) == %p\n", buf_name, (void *)buffer);
-        dbg("of_target (%s) == %p\n", of_target_name, g.of_target);
-        dbg("jump_target (%s) == %p\n", jump_target_name, g.jump_target);
-        dbg("overflow_ptr (%s) == %p\n", overflow_ptr_name, g.payload.overflow_ptr);
-    }
+    dbg("buffer (%s) == %p\n", buf_name, (void *)buffer);
+    dbg("of_target (%s) == %p\n", of_target_name, g.of_target);
+    dbg("jump_target (%s) == %p\n", jump_target_name, g.jump_target);
+    dbg("overflow_ptr (%s) == %p\n", overflow_ptr_name, g.payload.overflow_ptr);
     ptrdiff_t target_offset = (uintptr_t)g.of_target - (uintptr_t)buffer;
     if (target_offset < 0) {
-        if (g.output_debug_info)
-            err("of_target (0x%0*" PRIxPTR ") has to be > buffer (0x%0*" PRIxPTR "), but isn't.\n",
-              PRIxPTR_WIDTH, (uintptr_t)g.of_target, PRIxPTR_WIDTH, (uintptr_t)buffer);
+        err("of_target (0x%0*" PRIxPTR ") has to be > buffer (0x%0*" PRIxPTR "), but isn't.\n",
+            PRIxPTR_WIDTH, (uintptr_t)g.of_target, PRIxPTR_WIDTH, (uintptr_t)buffer);
         return RET_ERR;
     }
 
@@ -737,8 +737,7 @@ perform_attack(
     buffer[0] = '\0';
 
     if (!build_payload(&g.payload, target_offset, shellcode, size_shellcode)) {
-        if (g.output_debug_info)
-            err("Error: Could not build payload\n");
+        err("Error: Could not build payload\n");
         return RET_RT_IMPOSSIBLE;
     }
 
@@ -785,8 +784,7 @@ perform_attack(
             attack_ret = (uintptr_t)strncat((char *)buffer, g.payload.buffer, g.payload.size);
             break;
         default:
-            if (g.output_debug_info)
-                err("Error: Unknown choice of function\n");
+            err("Error: Unknown choice of function\n");
             return RET_ERR;
     }
     if (attack_ret != 0)
@@ -918,10 +916,8 @@ build_payload(struct payload * payload, ptrdiff_t offset, uint8_t * shellcode, s
     size_t bytes_to_pad =
       (payload->size - size_shellcode - sizeof(void *) - sizeof(char));
 
-    if (g.output_debug_info) {
-        dbg("bytes to pad: %zu\n", bytes_to_pad);
-        dbg("overflow_ptr: %p\n", payload->overflow_ptr);
-    }
+    dbg("bytes to pad: %zu\n", bytes_to_pad);
+    dbg("overflow_ptr: %p\n", payload->overflow_ptr);
 
     /* In general we could pad the payload buffer with any data.
      * However, we pad with a related legal address to help setjmp-based attacks
@@ -943,9 +939,8 @@ build_payload(struct payload * payload, ptrdiff_t offset, uint8_t * shellcode, s
 
     char *first_null = memchr(payload->buffer, '\0', payload->size-1);
     if (first_null != NULL) {
-        if (g.output_debug_info)
-            dbg("Payload contains null character at offset %"PRIdPTR"\n",
-                (uintptr_t)first_null-(uintptr_t)payload->buffer);
+        dbg("Payload contains null character at offset %"PRIdPTR"\n",
+            (uintptr_t)first_null-(uintptr_t)payload->buffer);
 
         if (g.attack.function == SSCANF ||
             g.attack.function == STRCPY ||
@@ -954,8 +949,7 @@ build_payload(struct payload * payload, ptrdiff_t offset, uint8_t * shellcode, s
             g.attack.function == SNPRINTF ||
             g.attack.function == STRCAT ||
             g.attack.function == STRNCAT) {
-            if (g.output_debug_info)
-                dbg("This cannot work with string functions, aborting\n");
+            dbg("This cannot work with string functions, aborting\n");
             return false;
         }
     }
@@ -963,17 +957,15 @@ build_payload(struct payload * payload, ptrdiff_t offset, uint8_t * shellcode, s
     /* Finally, add the terminating null character at the end */
     payload->buffer[payload->size - 1] = '\0';
     
-    if (g.output_debug_info) {
-        dbg("payload of %zu bytes created.\n", payload->size);
-        dbg("----------------\n");
-    }
+    dbg("payload of %zu bytes created.\n", payload->size);
+    dbg("----------------\n");
 
     return true;
 } /* build_payload */
 
 static void
 dummy_function(void) {
-    printf("Dummy function\n");
+    info("Attack failed: dummy_function() reached.\n");
 }
 
 // call longjmp on a buffer in perform_attack()
@@ -1001,7 +993,7 @@ shellcode_target()
 {
     JUST_SOME_INSTRUCTIONS();
     DISABLE_PROTECTION();
-    printf("Attack succeeded: shellcode_target() reached.\n");
+    info("Attack succeeded: shellcode_target() reached.\n");
     longjmp_no_enforce(control_jmp_buffer, RET_ATTACK_SUCCESS);
 }
 
@@ -1010,7 +1002,7 @@ ret2libc_target()
 {
     JUST_SOME_INSTRUCTIONS();
     DISABLE_PROTECTION();
-    printf("Attack succeeded: ret2libc_target() reached.\n");
+    info("Attack succeeded: ret2libc_target() reached.\n");
     longjmp_no_enforce(control_jmp_buffer, RET_ATTACK_SUCCESS);
 }
 
@@ -1019,7 +1011,7 @@ indirect_target()
 {
     JUST_SOME_INSTRUCTIONS();
     DISABLE_PROTECTION();
-    printf("Attack succeeded: indirect_target() reached.\n");
+    info("Attack succeeded: indirect_target() reached.\n");
     longjmp_no_enforce(control_jmp_buffer, RET_ATTACK_SUCCESS);
 }
 
@@ -1029,11 +1021,11 @@ dop_target(uint32_t auth)
     JUST_SOME_INSTRUCTIONS();
     if (!auth) {
         DISABLE_PROTECTION();
-        dbg("DOP attack failed\n");
+        info("DOP attack failed\n");
         longjmp_no_enforce(control_jmp_buffer, RET_ATTACK_FAIL);
     } else {
         DISABLE_PROTECTION();
-        printf("Attack succeeded: DOP memory corruption reached.\n");
+        info("Attack succeeded: DOP memory corruption reached.\n");
         longjmp_no_enforce(control_jmp_buffer, RET_ATTACK_SUCCESS);
     }
 }
@@ -1049,7 +1041,7 @@ rop_target(void)
 {
     JUST_SOME_INSTRUCTIONS();
     DISABLE_PROTECTION();
-    printf("Attack succeeded: ROP function reached.\n");
+    info("Attack succeeded: ROP function reached.\n");
     longjmp_no_enforce(control_jmp_buffer, RET_ATTACK_SUCCESS);
 }
 
@@ -1082,10 +1074,10 @@ data_leak(uint8_t *buf) {
     DISABLE_PROTECTION();
     if ((strncmp((char *)msg, SECRET_STRING_START, common_len) == 0) &&
         (strcmp((char *)(msg+common_len), loc_string) == 0)) {
-        printf("Attack succeeded: found correct secret: \"%s\"\n", msg);
+        info("Attack succeeded: found correct secret: \"%s\"\n", msg);
         longjmp_no_enforce(control_jmp_buffer, RET_ATTACK_SUCCESS);
     }
-    dbg("msg does not match secret string\n");
+    info("Data leak attack failed: msg does not match secret string\n");
 }
 
 char *

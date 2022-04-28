@@ -46,7 +46,7 @@ const char * const opt_funcs[] = {"memcpy", "homebrew", "sscanf", "strcpy", "str
 size_t nr_of_funcs = ARR_ELEMS(opt_funcs);
 
 #ifndef RIPE_NO_CLI
-int parse_ripe_params(int argc, char ** argv, struct attack_form *attack, bool *debug) {
+int parse_ripe_params(int argc, char ** argv, struct attack_form *attack, unsigned int *debug) {
     int rv = 0;
     int c;
     while ((c = getopt(argc, argv, "t:i:c:l:f:d")) != -1) {
@@ -67,8 +67,7 @@ int parse_ripe_params(int argc, char ** argv, struct attack_form *attack, bool *
                 rv |= set_function(optarg, &attack->function);
                 break;
             case 'd':
-                *debug = true;
-                dbg("debug info enabled\n");
+                *debug = *debug + 1;
                 break;
             default:
                 return 1;
@@ -79,6 +78,7 @@ int parse_ripe_params(int argc, char ** argv, struct attack_form *attack, bool *
             argv[optind]);
         return 1;
     }
+    dbg("output level is set to %d\n", *debug);
     return rv;
 }
 

@@ -68,9 +68,9 @@ typedef void (func_t)(void);
  * -c code pointer
  * -l memory location
  * -f function to overflow with
- * -d output debug info
+ * -d increase output verbosity
  */
-int parse_ripe_params(int argc, char ** argv, struct attack_form *attack, bool *debug);
+int parse_ripe_params(int argc, char ** argv, struct attack_form *attack, unsigned int *debug);
 
 extern const char * const opt_techniques[];
 extern size_t nr_of_techniques;
@@ -101,7 +101,7 @@ size_t prologue_length (void);
  * addresses are safe, i.e. are not between overflown buffers and their targets.
  * This is only possible in C by stuffing everything in structs... */
 extern struct ripe_globals {
-    bool output_debug_info;
+    unsigned int output_level;
     bool output_reasons;
     unsigned int possible;
     unsigned int impossible;
@@ -132,9 +132,12 @@ extern struct ripe_globals g;
 
 int ripe(int argc, char ** argv);
 
-/* Print out only if output_debug_info is set */
-void dbg(const char *fmt, ...) __attribute__((format(__printf__, 1, 2)));
+/* Print out to stderr no matter the output level */
 void err(const char *fmt, ...) __attribute__((format(__printf__, 1, 2)));
+/* Print out only if output_level is >= 1 */
+void info(const char *fmt, ...) __attribute__((format(__printf__, 1, 2)));
+/* Print out only if output_level is >= 2 */
+void dbg(const char *fmt, ...) __attribute__((format(__printf__, 1, 2)));
 
 extern jmp_buf control_jmp_buffer;
 /* longjmp implementation that does not enforce any security mechanism to
